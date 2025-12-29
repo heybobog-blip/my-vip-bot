@@ -1,27 +1,22 @@
-import logging
+import os
+import json
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
-# =================ตั้งค่าข้อมูลระบบ=================
-TOKEN = '8424584627:AAGGgqbpSOpGTZC_PITxcwVVjPv49qlYi-Q'
-ADMIN_GROUP_ID = -5101530019  # ไอดีกลุ่มแอดมินสำหรับส่งสลิปไปตรวจสอบ
+# =================ตั้งค่าข้อมูลระบบ (ดึงจาก Vercel Environment)=================
+# เราจะไปตั้งค่า TOKEN ในหน้าเว็บ Vercel เพื่อความปลอดภัย
+TOKEN = os.environ.get("TELEGRAM_TOKEN") 
+ADMIN_GROUP_ID = -5101530019
 QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 
-# ลิ้งค์กลุ่มสำหรับแต่ละราคา
 LINK_200 = "https://t.me/+m2H5MlD_04c2N2M1"
 LINK_400 = "https://t.me/+6tEwQkfNvfc4ZTBl"
 LINK_999 = "https://t.me/+m2H5MlD_04c2N2M1"
 
-# ข้อความขอบคุณ (เหมือนกันทุกราคา)
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 # ===============================================
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-# ข้อความต้อนรับ
 WELCOME_TEXT = """
 กลุ่ม VVIP By.เซียนจู
 
@@ -36,11 +31,11 @@ https://t.me/+5sWrRGBIm3Y5ODE1
 https://t.me/+uoEnKbH_PP05NWQ1
 """
 
+# เตรียมบอท (Initialize Application)
+application = ApplicationBuilder().token(TOKEN).build()
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. ส่งข้อความรายละเอียด
     await context.bot.send_message(chat_id=update.effective_chat.id, text=WELCOME_TEXT)
-    
-    # 2. ส่งรูป QR Code จากลิ้งค์
     try:
         await context.bot.send_photo(
             chat_id=update.effective_chat.id, 
@@ -48,87 +43,84 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption="📸 สแกน QR Code เพื่อชำระเงิน\n\nโอนแล้ว **ส่งสลิป** เข้ามาในแชทนี้ได้เลยครับ แอดมินจะตรวจสอบสักครู่"
         )
     except Exception as e:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"เกิดข้อผิดพลาดในการโหลดรูป QR: {e}")
+        print(f"Error sending photo: {e}")
 
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     user_id = user.id
-    username = user.username if user.username else "No Username"
-    first_name = user.first_name if user.first_name else "ลูกค้า"
+    name = user.first_name
     
-    # แจ้งลูกค้าว่าได้รับแล้ว
     await update.message.reply_text("⏳ ได้รับสลิปแล้วครับ รอแอดมินตรวจสอบและกดอนุมัติสักครู่นะครับ...")
 
-    # สร้างปุ่ม 3 ปุ่มสำหรับแอดมิน (ฝัง user_id ไว้ในปุ่ม)
     keyboard = [
         [
-            InlineKeyboardButton("✅ 200 บาท", callback_data=f"approve_200_{user_id}"),
-            InlineKeyboardButton("✅ 400 บาท", callback_data=f"approve_400_{user_id}")
+            InlineKeyboardButton("✅ 200", callback_data=f"ap_200_{user_id}"),
+            InlineKeyboardButton("✅ 400", callback_data=f"ap_400_{user_id}")
         ],
         [
-            InlineKeyboardButton("✅ 999 บาท (ถาวร)", callback_data=f"approve_999_{user_id}")
+            InlineKeyboardButton("✅ 999 (ถาวร)", callback_data=f"ap_999_{user_id}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # ข้อความส่งหาแอดมิน
-    caption_text = f"📩 สลิปใหม่จากลูกค้า!\nชื่อ: {first_name} (@{username})\nID: {user_id}\n\nตรวจสอบยอดแล้วกดปุ่มด้านล่าง:"
+    caption_text = f"📩 สลิปใหม่!\nชื่อ: {name}\nID: {user_id}\n\nตรวจสอบยอดแล้วกดปุ่ม:"
     
-    # ส่งรูปสลิปไปที่กลุ่มแอดมิน
     try:
-        await context.bot.send_photo(
-            chat_id=ADMIN_GROUP_ID,
-            photo=update.message.photo[-1].file_id,
-            caption=caption_text,
-            reply_markup=reply_markup
-        )
+        await context.bot.send_photo(chat_id=ADMIN_GROUP_ID, photo=update.message.photo[-1].file_id, caption=caption_text, reply_markup=reply_markup)
     except Exception as e:
-        print(f"Error sending slip to admin: {e}")
+        print(f"Error sending to admin: {e}")
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # ตอบรับการกดปุ่ม
+    await query.answer()
 
-    data = query.data.split('_') # ข้อมูลรูปแบบ: action_price_userid
-    action = data[0]
+    data = query.data.split('_')
     price = data[1]
     customer_id = int(data[2])
 
-    if action == "approve":
-        invite_link = ""
+    invite_link = LINK_200 if price == "200" else (LINK_400 if price == "400" else LINK_999)
+    final_message = f"✅ ยอด {price} บาท อนุมัติเรียบร้อยครับ\n\nเข้ากลุ่ม: {invite_link}\n\n{THANK_YOU_TEXT}"
+
+    try:
+        await context.bot.send_message(chat_id=customer_id, text=final_message)
+        await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ อนุมัติยอด {price} เรียบร้อย")
+    except Exception as e:
+        print(f"Error replying to customer: {e}")
+
+# ลงทะเบียน Handler
+application.add_handler(CommandHandler('start', start))
+application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
+application.add_handler(CallbackQueryHandler(button_click))
+
+# ฟังก์ชันหลักสำหรับ Vercel
+from http.server import BaseHTTPRequestHandler
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_len = int(self.headers.get('Content-Length'))
+        post_body = self.rfile.read(content_len)
+        json_string = post_body.decode('utf-8')
         
-        # เลือกลิ้งค์ตามราคา
-        if price == "200":
-            invite_link = LINK_200
-        elif price == "400":
-            invite_link = LINK_400
-        elif price == "999":
-            invite_link = LINK_999
+        # แปลงข้อมูล JSON เป็น Update object
+        update_data = json.loads(json_string)
+        
+        async def main():
+            async with application:
+                update = Update.de_json(update_data, application.bot)
+                await application.process_update(update)
 
-        # ข้อความที่จะส่งให้ลูกค้า
-        final_message = f"✅ ยอด {price} บาท อนุมัติเรียบร้อยครับ\n\nกดเข้ากลุ่มได้ที่นี่: {invite_link}\n\n{THANK_YOU_TEXT}"
-
+        # รัน Async Loop
         try:
-            # 1. ส่งข้อความหาลูกค้า
-            await context.bot.send_message(chat_id=customer_id, text=final_message)
-            
-            # 2. แก้ไขข้อความในกลุ่มแอดมินว่าใครเป็นคนกดอนุมัติ
-            admin_name = query.from_user.first_name
-            await query.edit_message_caption(
-                caption=f"{query.message.caption}\n\n✅ อนุมัติยอด {price} แล้วโดย {admin_name}"
-            )
-        except Exception as e:
-            # กรณีส่งหาลูกค้าไม่ได้ (เช่น บล็อกบอท)
-            await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=f"⚠️ ส่งลิ้งค์ให้ลูกค้า ID {customer_id} ไม่สำเร็จ: {e}")
+            asyncio.run(main())
+        except RuntimeError:
+            # กรณี Loop รันอยู่แล้ว (บาง environment)
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
 
-if __name__ == '__main__':
-    print("Starting Bot...")
-    application = ApplicationBuilder().token(TOKEN).build()
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK')
 
-    # Handlers
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
-    application.add_handler(CallbackQueryHandler(button_click))
-
-    print("Bot is running...")
-    application.run_polling()
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
