@@ -120,7 +120,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             # สร้างปุ่มสำหรับกลุ่มนั้นๆ
-            btn_text = f"🔗 กดเข้า {group['name']}"
+            btn_text = f"⭐️ กดเข้า {group['name']}"
             keyboard.append([InlineKeyboardButton(btn_text, url=invite_link_obj.invite_link)])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
