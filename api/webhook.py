@@ -42,16 +42,21 @@ application = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     WELCOME_TEXT = """
-กลุ่ม VVIP By.เซียนจู
+🔥 VVIP By.เซียนจู — ทีเด็ดงานดี ห้ามพลาด! 🔥
 
-ค่าเข้า 200 บาท ( เซฟไม่ได้)
-400 บาท ( เซฟได้ )
-999 ถาวรเข้าได้ทุกกลุ่ม
+👇 เรทราคาค่าเข้า
+✅ 200 บาท : ดูในกลุ่ม (เซฟไม่ได้)
+✅ 400 บาท : ดู + เซฟลงเครื่องได้ 💾
 
-ตัวอย่างกลุ่มVVIP
+🚀 PROMOTION เหมาจบ!!
+🏆 999 บาท (VIP ถาวร)
+เข้าได้ทุกห้อง! ทั้งห้องหลัก ห้อง Save และห้องใหม่
+(จ่ายครั้งเดียว จบเลย ไม่ต้องจ่ายเพิ่ม)
+
+👀 ดูตัวอย่างงานก่อนตัดสินใจ
 https://t.me/+5sWrRGBIm3Y5ODE1
 
-เช็คเครดิตได้ที่
+🛡 เครดิตแน่น รีวิวเพียบ
 https://t.me/+uoEnKbH_PP05NWQ1
 """
     await context.bot.send_message(chat_id=update.effective_chat.id, text=WELCOME_TEXT)
