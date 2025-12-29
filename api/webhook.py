@@ -17,7 +17,7 @@ QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 GROUP_ID_200 = -1003465527678  # ### แก้ตรงนี้: ใส่ ID กลุ่มราคา 200 ###
 GROUP_ID_400 = -1003477489997  # ### แก้ตรงนี้: ใส่ ID กลุ่มราคา 400 ###
 GROUP_ID_999 = -1003465527678  # ### แก้ตรงนี้: ใส่ ID กลุ่มราคา 999 ###
-GROUP_ID_NEW = -1003578310056  # ใส่เลขกลุ่มใหม่
+GROUP_ID_200V2 = -1003578310056  # ใส่เลขกลุ่มใหม่
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 # ===============================================
@@ -103,7 +103,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_groups.append({"id": GROUP_ID_400, "name": "ห้อง 400"})
         target_groups.append({"id": GROUP_ID_999, "name": "ห้อง VIP"})
         # target_groups.append({"id": GROUP_ID_NEW, "name": "ห้องน้องใหม่"})  <-- ใส่เพิ่มตรงนี้
-        target_groups.append({"id": GROUP_ID_NEW, "name": "ห้องน้องใหม่"})
+        target_groups.append({"id": GROUP_ID_200V2, "name": "ห้องน้องใหม่"})
         
     # ==================================================================
 
