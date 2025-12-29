@@ -150,4 +150,28 @@ application.add_handler(CallbackQueryHandler(button_click))
 # 2. ฟังก์ชันสำหรับ Vercel (เพื่อให้ Server รันได้)
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        content_len = int(self.headers
+        content_len = int(self.headers.get('Content-Length'))
+        post_body = self.rfile.read(content_len)
+        json_string = post_body.decode('utf-8')
+        
+        update_data = json.loads(json_string)
+        
+        async def main():
+            async with application:
+                update = Update.de_json(update_data, application.bot)
+                await application.process_update(update)
+
+        try:
+            asyncio.run(main())
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
+
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK')
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
