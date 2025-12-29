@@ -13,7 +13,7 @@ QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 # ---------------------------------------------------------
 # [สำคัญ] เอาเลข ID กลุ่ม (ที่ขึ้นต้นด้วย -100) มาใส่ตรงนี้ครับ
 # ---------------------------------------------------------
-GROUP_ID_200_V1 = -1003465527678   # กลุ่ม 200
+GROUP_ID_200 = -1003465527678   # กลุ่ม 200
 GROUP_ID_400 = -1003477489997   # กลุ่ม 400
 GROUP_ID_999 = -1003465527678   # กลุ่ม VIP
 # GROUP_ID_200V2 = -1003592949127 # กลุ่มน้องใหม่
@@ -127,7 +127,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_groups.append({"id": GROUP_ID_400, "name": "ห้อง 400"})
         
     else: # กรณี 999
-        target_groups.append({"id": GROUP_ID_200_V1, "name": "ห้อง VVIP V1"})
+        target_groups.append({"id": GROUP_ID_200, "name": "ห้อง VVIP V1"})
         # target_groups.append({"id": GROUP_ID_400, "name": "ห้อง VVIP V1 SAVE"})
         # target_groups.append({"id": GROUP_ID_999, "name": "ห้อง VIP"})
         # target_groups.append({"id": GROUP_ID_200V2, "name": "ห้องน้องใหม่"}) 
