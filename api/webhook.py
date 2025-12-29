@@ -16,7 +16,7 @@ QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 GROUP_ID_200 = -1003465527678   # กลุ่ม 200
 GROUP_ID_400 = -1003477489997   # กลุ่ม 400
 GROUP_ID_999 = -1003465527678   # กลุ่ม VIP
-GROUP_ID_200V2 = -1003592949127 # กลุ่มน้องใหม่ (ที่คุณเพิ่มมา)
+# GROUP_ID_200V2 = -1003592949127 # กลุ่มน้องใหม่
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 # ===============================================
@@ -44,18 +44,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(
             chat_id=update.effective_chat.id, 
             photo=QR_IMAGE_URL,
-            caption="📸 สแกน QR Code เพื่อชำระเงิน\n\nโอนแล้ว **ส่งสลิป** เข้ามาในแชทนี้ได้เลยครับ แอดมินจะตรวจสอบสักครู่"
+            caption="📸 **ชำระเงินได้ 2 ช่องทาง**\n\n1. สแกน QR Code แล้วส่งสลิป\n2. หรือ ส่งลิ้งก์ซองของขวัญ (TrueMoney) มาในแชทนี้ได้เลยครับ"
         )
     except Exception as e:
         print(f"Error sending photo: {e}")
 
+# ---------------------------------------------------------
+# ฟังก์ชันจัดการ: รูปภาพสลิป
+# ---------------------------------------------------------
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     user_id = user.id
     name = user.first_name
     
-    await update.message.reply_text("⏳ ได้รับสลิปแล้วครับ รอแอดมินตรวจสอบและกดอนุมัติสักครู่นะครับ...")
-
+    await update.message.reply_text("⏳ ได้รับสลิปแล้วครับ รอแอดมินตรวจสอบสักครู่นะครับ...")
+    
+    # สร้างปุ่มสำหรับแอดมิน
     keyboard = [
         [
             InlineKeyboardButton("✅ 200", callback_data=f"ap_200_{user_id}"),
@@ -66,12 +70,45 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    caption_text = f"📩 สลิปใหม่!\nชื่อ: {name}\nID: {user_id}\n\nตรวจสอบยอดแล้วกดปุ่ม:"
+    caption_text = f"📩 **สลิปใหม่ (โอนธนาคาร)**\nชื่อ: {name}\nID: {user_id}\n\nตรวจสอบยอดแล้วกดปุ่ม:"
     
     try:
         await context.bot.send_photo(chat_id=ADMIN_GROUP_ID, photo=update.message.photo[-1].file_id, caption=caption_text, reply_markup=reply_markup)
     except Exception as e:
         print(f"Error sending to admin: {e}")
+
+# ---------------------------------------------------------
+# [ใหม่] ฟังก์ชันจัดการ: ลิ้งก์ซอง TrueMoney
+# ---------------------------------------------------------
+async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    user = update.message.from_user
+    user_id = user.id
+    name = user.first_name
+
+    # ตอบกลับลูกค้า
+    await update.message.reply_text("🧧 ได้รับลิ้งก์ซองแล้วครับ! แอดมินกำลังกดรับและตรวจสอบยอด สักครู่นะครับ...")
+
+    # สร้างปุ่มสำหรับแอดมิน
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ 200", callback_data=f"ap_200_{user_id}"),
+            InlineKeyboardButton("✅ 400", callback_data=f"ap_400_{user_id}")
+        ],
+        [
+            InlineKeyboardButton("✅ 999 (ถาวร)", callback_data=f"ap_999_{user_id}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # ส่งข้อความให้แอดมินกดรับซอง
+    admin_text = f"🧧 **มีซอง TrueMoney เข้าใหม่!**\n\nจากลูกค้า: {name}\nลิ้งก์: {text}\n\n👉 **กดที่ลิ้งก์เพื่อรับเงิน** แล้วกลับมากดปุ่มอนุมัติด้านล่างครับ:"
+
+    try:
+        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text, reply_markup=reply_markup)
+    except Exception as e:
+        print(f"Error sending link to admin: {e}")
+
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -81,47 +118,35 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     price = data[1]
     customer_id = int(data[2])
 
-    # ==================================================================
-    # [จุดแก้] กำหนดว่าราคาไหน จะได้เข้ากลุ่มไหนบ้าง
-    # ==================================================================
-    target_groups = [] # สร้างลิสต์รายการกลุ่มที่จะส่งให้ลูกค้า
+    target_groups = [] 
 
     if price == "200":
-        # ราคา 200 ได้เข้ากลุ่มเดียว
         target_groups.append({"id": GROUP_ID_200, "name": "ห้อง 200"}) 
         
     elif price == "400":
-        # ราคา 400 ได้เข้ากลุ่มเดียว
         target_groups.append({"id": GROUP_ID_400, "name": "ห้อง 400"})
         
-    else: # กรณี 999 (เหมาหมด) หรือ VIP
+    else: # กรณี 999
         target_groups.append({"id": GROUP_ID_200, "name": "ห้อง 200"})
         target_groups.append({"id": GROUP_ID_400, "name": "ห้อง 400"})
         target_groups.append({"id": GROUP_ID_999, "name": "ห้อง VIP"})
-        target_groups.append({"id": GROUP_ID_200V2, "name": "ห้องน้องใหม่"}) # <-- อันใหม่ที่เพิ่ม
+        # target_groups.append({"id": GROUP_ID_200V2, "name": "ห้องน้องใหม่"}) 
         
-    # ==================================================================
 
     try:
         keyboard = []
-        
-        # วนลูปสร้างลิ้งก์ตามจำนวนกลุ่มที่อยู่ในลิสต์
         for group in target_groups:
-            # สร้างลิ้งก์แบบเข้าครั้งเดียว
             invite_link_obj = await context.bot.create_chat_invite_link(
                 chat_id=group["id"], 
                 member_limit=1, 
                 name=f"VVIP {price} Slip {customer_id}"
             )
-            
-            # สร้างปุ่มสำหรับกลุ่มนั้นๆ
             btn_text = f"⭐️ กดเข้า {group['name']}"
             keyboard.append([InlineKeyboardButton(btn_text, url=invite_link_obj.invite_link)])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         final_message = f"✅ ยอด {price} บาท อนุมัติเรียบร้อยครับ\n\n👇 กดปุ่มด้านล่างเพื่อเข้ากลุ่มได้เลยครับ\n(แยกลิ้งก์ตามกลุ่ม กดเข้าให้ครบนะครับ)\n\n{THANK_YOU_TEXT}"
 
-        # ส่งข้อความหาลูกค้า
         await context.bot.send_message(
             chat_id=customer_id, 
             text=final_message, 
@@ -130,7 +155,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # แก้ไขข้อความในห้องแอดมิน
-        await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ อนุมัติยอด {price} เรียบร้อย\n(ส่งไป {len(target_groups)} ลิ้งก์)")
+        if query.message.caption: # กรณีเป็นรูปภาพ
+             await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ อนุมัติยอด {price} เรียบร้อย")
+        else: # กรณีเป็นข้อความ (ซองทรู)
+             await query.edit_message_text(text=f"{query.message.text}\n\n✅ อนุมัติยอด {price} เรียบร้อย")
 
     except Exception as e:
         print(f"Error generating link or replying: {e}")
@@ -139,15 +167,23 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ===========================================================
-# 🚨 ส่วนที่หายไป (ต้องมี ไม่งั้นบอทไม่ทำงาน) 🚨
+# ส่วนลงทะเบียน Handler
 # ===========================================================
 
-# 1. ลงทะเบียน Handler (บอกบอทว่าฟังก์ชันไหนทำอะไร)
 application.add_handler(CommandHandler('start', start))
+
+# รับรูปภาพ (สลิป)
 application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
+
+# รับข้อความที่มีคำว่า gift.truemoney.com (ซอง)
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex("gift.truemoney.com"), handle_truemoney))
+
+# จัดการปุ่มกด
 application.add_handler(CallbackQueryHandler(button_click))
 
-# 2. ฟังก์ชันสำหรับ Vercel (เพื่อให้ Server รันได้)
+# ===========================================================
+# ส่วน Server สำหรับ Vercel
+# ===========================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_len = int(self.headers.get('Content-Length'))
