@@ -3,9 +3,9 @@ import json
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from http.server import BaseHTTPRequestHandler
 
-# =================ตั้งค่าข้อมูลระบบ (ดึงจาก Vercel Environment)=================
-# เราจะไปตั้งค่า TOKEN ในหน้าเว็บ Vercel เพื่อความปลอดภัย
+# =================ตั้งค่าข้อมูลระบบ=================
 TOKEN = os.environ.get("TELEGRAM_TOKEN") 
 ADMIN_GROUP_ID = -5101530019
 QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
@@ -31,7 +31,7 @@ https://t.me/+5sWrRGBIm3Y5ODE1
 https://t.me/+uoEnKbH_PP05NWQ1
 """
 
-# เตรียมบอท (Initialize Application)
+# เตรียมบอท
 application = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,11 +77,25 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     price = data[1]
     customer_id = int(data[2])
 
+    # เลือกลิ้งค์
     invite_link = LINK_200 if price == "200" else (LINK_400 if price == "400" else LINK_999)
-    final_message = f"✅ ยอด {price} บาท อนุมัติเรียบร้อยครับ\n\nเข้ากลุ่ม: {invite_link}\n\n{THANK_YOU_TEXT}"
+    
+    # --- ส่วนสร้างปุ่มลิ้งค์ ---
+    keyboard = [
+        [InlineKeyboardButton("🔗 แตะเพื่อเข้ากลุ่ม VVIP ทันที", url=invite_link)]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    final_message = f"✅ ยอด {price} บาท อนุมัติเรียบร้อยครับ\n\n👇 กดปุ่มด้านล่างเพื่อเข้ากลุ่มได้เลยครับ\n\n{THANK_YOU_TEXT}"
 
     try:
-        await context.bot.send_message(chat_id=customer_id, text=final_message)
+        # ส่งข้อความ + ปุ่ม + กันก๊อปปี้ (protect_content=True)
+        await context.bot.send_message(
+            chat_id=customer_id, 
+            text=final_message, 
+            reply_markup=reply_markup,
+            protect_content=True
+        )
         await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ อนุมัติยอด {price} เรียบร้อย")
     except Exception as e:
         print(f"Error replying to customer: {e}")
@@ -91,16 +105,13 @@ application.add_handler(CommandHandler('start', start))
 application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
 application.add_handler(CallbackQueryHandler(button_click))
 
-# ฟังก์ชันหลักสำหรับ Vercel
-from http.server import BaseHTTPRequestHandler
-
+# ฟังก์ชันสำหรับ Vercel
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_len = int(self.headers.get('Content-Length'))
         post_body = self.rfile.read(content_len)
         json_string = post_body.decode('utf-8')
         
-        # แปลงข้อมูล JSON เป็น Update object
         update_data = json.loads(json_string)
         
         async def main():
@@ -108,11 +119,9 @@ class handler(BaseHTTPRequestHandler):
                 update = Update.de_json(update_data, application.bot)
                 await application.process_update(update)
 
-        # รัน Async Loop
         try:
             asyncio.run(main())
         except RuntimeError:
-            # กรณี Loop รันอยู่แล้ว (บาง environment)
             loop = asyncio.get_event_loop()
             loop.run_until_complete(main())
 
