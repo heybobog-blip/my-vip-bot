@@ -41,19 +41,26 @@ THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝาก�
 application = ApplicationBuilder().token(TOKEN).build()
 
 # =========================================================
-# ฟังก์ชันแกะซอง TrueMoney (ทำงานเบื้องหลัง)
+# ฟังก์ชันแกะซอง TrueMoney (ฉบับแก้ไข: เพิ่ม User-Agent หลอก server)
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
         # ดึงรหัส Voucher จาก URL
         match = re.search(r'v=([a-zA-Z0-9]+)', url)
         if not match:
-            return {"status": "error", "message": "ลิ้งก์ไม่ถูกต้อง"}
+            return {"status": "error", "message": "รูปแบบลิ้งก์ไม่ถูกต้อง"}
         
         voucher_code = match.group(1)
         
-        # ส่ง Request ไปหา TrueMoney
-        headers = {'content-type': 'application/json'}
+        # [แก้จุดที่ 1] เพิ่ม User-Agent ให้เหมือน Chrome Browser
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Origin': 'https://gift.truemoney.com',
+            'Referer': 'https://gift.truemoney.com/'
+        }
+        
         payload = {
             "mobile": phone_number,
             "voucher_hash": voucher_code
@@ -63,10 +70,17 @@ def redeem_truemoney(url, phone_number):
             f"https://gift.truemoney.com/campaign/vouchers/{voucher_code}/redeem", 
             json=payload, 
             headers=headers,
-            timeout=10
+            timeout=15
         )
         
-        data = response.json()
+        # [แก้จุดที่ 2] เช็คก่อนว่า TrueMoney ตอบกลับมาเป็น JSON หรือไม่
+        if response.status_code != 200:
+             return {"status": "error", "message": f"Server ปฏิเสธการเชื่อมต่อ (Code: {response.status_code}) อาจเป็นเพราะ IP ต่างประเทศ"}
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "อ่านค่าจาก TrueMoney ไม่ได้ (Response ไม่ใช่ JSON)"}
         
         if data['status']['code'] == 'SUCCESS':
             amount = float(data['data']['my_ticket']['amount_baht'])
@@ -80,7 +94,7 @@ def redeem_truemoney(url, phone_number):
         elif data['status']['code'] == 'VOUCHER_OUT_OF_STOCK':
              return {"status": "error", "message": "ซองนี้หมดแล้ว"}
         else:
-            return {"status": "error", "message": "เกิดข้อผิดพลาด หรือ ลิ้งก์หมดอายุ"}
+            return {"status": "error", "message": f"รับเงินไม่ได้: {data['status']['code']}"}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -103,7 +117,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 เพียงส่ง "ลิ้งก์ซองของขวัญ" มาในแชทนี้
 บอทจะตรวจสอบยอดและส่งทางเข้าให้ทันที!
 """
-    # ปุ่มติดต่อ Admin
     keyboard = [
         [InlineKeyboardButton("💬 ติดต่อ Admin (1)", url="https://t.me/ZeinJu001")],
         [InlineKeyboardButton("💬 ติดต่อ Admin (2)", url="https://t.me/duded16")]
@@ -117,9 +130,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
-# ---------------------------------------------------------
-# ฟังก์ชัน: แจ้งเตือนเมื่อลูกค้าส่งรูป/สลิป (ปฏิเสธ)
-# ---------------------------------------------------------
 async def reject_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     warning_text = """
 ❌ **ระบบไม่รับสลิปธนาคาร หรือ QR Code ครับ**
@@ -129,9 +139,6 @@ async def reject_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(warning_text)
 
-# ---------------------------------------------------------
-# ฟังก์ชัน: รับลิ้งก์ซอง TrueMoney และทำงานอัตโนมัติ
-# ---------------------------------------------------------
 async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user_id = update.message.from_user.id
@@ -140,29 +147,23 @@ async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤖 บอทได้รับลิ้งก์แล้ว กำลังตรวจสอบและรับเงินอัตโนมัติ รอสักครู่ครับ...")
 
     # เรียกใช้ฟังก์ชันรับเงิน
-    # หมายเหตุ: การใช้ requests ใน async อาจหน่วงนิดหน่อย แต่ถ้ายอดไม่เยอะใช้ได้ครับ
-    try:
-        result = redeem_truemoney(link, MY_PHONE_NUMBER)
-    except Exception as e:
-        result = {"status": "error", "message": f"System Error: {e}"}
+    result = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
 
     # -----------------------------------------------------
     # กรณีรับเงินสำเร็จ
     # -----------------------------------------------------
     if result['status'] == 'success':
-        amount = result['amount'] # ยอดเงินที่ได้รับ (Integer)
+        amount = result['amount'] 
         sender = result['sender']
         
-        # 1. แจ้งแอดมินว่าบอทรับเงินแล้ว
+        # แจ้งแอดมิน
         admin_report = f"💰 **บอทรับเงินสำเร็จ!**\n\nจาก: {user_name} (ID: {user_id})\nยอดเงิน: {amount} บาท\nชื่อในซอง: {sender}\n\n✅ ระบบกำลังส่งลิ้งก์ให้ลูกค้า..."
         try:
             await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_report)
         except:
-            pass # ถ้าส่งหาแอดมินไม่ได้ ก็ปล่อยผ่านไปทำงานต่อ
+            pass 
 
-        # 2. Logic การส่งห้องตามยอดเงิน (Auto Approve)
-        
-        # >>>> กรณี 999 (เหมา) <<<<
+        # Auto Approve
         if amount >= 999:
             links_keyboard = []
             for group in ALL_ACCESS_ROOMS:
@@ -177,12 +178,10 @@ async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=final_markup
             )
 
-        # >>>> กรณี 200 หรือ 400 (เลือกห้อง) <<<<
-        elif str(amount) in SELECTABLE_ROOMS: # เช็คว่ายอดตรงกับคีย์ "200" หรือ "400" ไหม
+        elif str(amount) in SELECTABLE_ROOMS:
             rooms = SELECTABLE_ROOMS[str(amount)]
             customer_keyboard = []
             for room in rooms:
-                # สร้างปุ่มให้เลือก
                 callback_str = f"select_room_{room['id']}_{amount}"
                 customer_keyboard.append([InlineKeyboardButton(f"เลือกเข้า {room['name']}", callback_data=callback_str)])
             
@@ -192,27 +191,28 @@ async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=cust_markup
             )
         
-        # >>>> กรณียอดไม่ตรงเงื่อนไข <<<<
         else:
             await update.message.reply_text(
                 f"✅ ได้รับยอด {amount} บาท (แต่ไม่ตรงกับแพ็กเกจปกติ)\nกรุณาแคปหน้าจอนี้แจ้งแอดมินเพื่อตรวจสอบครับ"
             )
-            # เพิ่มปุ่มติดต่อแอดมินให้
-            contact_kb = [
-                [InlineKeyboardButton("💬 ติดต่อ Admin", url="https://t.me/ZeinJu001")]
-            ]
+            contact_kb = [[InlineKeyboardButton("💬 ติดต่อ Admin", url="https://t.me/ZeinJu001")]]
             await update.message.reply_text("หรือกดปุ่มเพื่อติดต่อแอดมิน:", reply_markup=InlineKeyboardMarkup(contact_kb))
 
     # -----------------------------------------------------
-    # กรณีรับเงินไม่สำเร็จ (เช่น ซองหมด, ลิ้งก์ผิด)
+    # กรณีรับเงินไม่สำเร็จ
     # -----------------------------------------------------
     else:
         error_msg = result['message']
-        await update.message.reply_text(f"❌ **ทำรายการไม่สำเร็จ**\n\nสาเหตุ: {error_msg}\n\nหากมั่นใจว่าลิ้งก์ถูก โปรดติดต่อแอดมินครับ")
-
+        contact_kb = [[InlineKeyboardButton("💬 แจ้งแอดมิน", url="https://t.me/ZeinJu001")]]
+        
+        # แจ้งลูกค้า
+        await update.message.reply_text(
+            f"❌ **ทำรายการไม่สำเร็จ**\n\nสาเหตุ: {error_msg}\n\nหากมั่นใจว่าลิ้งก์ถูกต้อง ให้กดปุ่มด้านล่างเพื่อแจ้งแอดมินครับ",
+            reply_markup=InlineKeyboardMarkup(contact_kb)
+        )
 
 # ---------------------------------------------------------
-# ฟังก์ชันจัดการปุ่มกด (สำหรับคนที่เลือกห้อง 200/400)
+# ฟังก์ชันจัดการปุ่มกด
 # ---------------------------------------------------------
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -226,18 +226,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target_group_id = int(parts[2])
             price_label = parts[3]
 
-            # สร้างลิ้งก์เข้ากลุ่ม
             invite_link_obj = await context.bot.create_chat_invite_link(
-                chat_id=target_group_id, 
-                member_limit=1, 
-                name=f"Auto Select {price_label}"
+                chat_id=target_group_id, member_limit=1, name=f"Auto Select {price_label}"
             )
             
-            # ปุ่มลิ้งก์
             link_keyboard = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=invite_link_obj.invite_link)]]
             link_markup = InlineKeyboardMarkup(link_keyboard)
             
-            # ลบปุ่มเลือกทิ้ง แทนที่ด้วยลิ้งก์
             await query.edit_message_text(
                 text=f"✅ **เลือกห้องเรียบร้อย**\n\nกดปุ่มด้านล่างเพื่อเข้าห้องได้เลยครับ:\n(ลิ้งก์ใช้ได้ครั้งเดียว)",
                 reply_markup=link_markup
@@ -248,19 +243,12 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await context.bot.send_message(chat_id=query.from_user.id, text="❌ เกิดข้อผิดพลาดในการสร้างลิ้งก์ โปรดติดต่อแอดมิน")
 
-
 # ===========================================================
 # Server
 # ===========================================================
-
 application.add_handler(CommandHandler('start', start))
-
-# ดักจับลิงค์ซอง TrueMoney (gift.truemoney.com)
 application.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_truemoney))
-
-# ดักจับรูปภาพ (เพื่อแจ้งเตือนว่าไม่รับ)
 application.add_handler(MessageHandler(filters.PHOTO, reject_slip))
-
 application.add_handler(CallbackQueryHandler(button_click))
 
 class handler(BaseHTTPRequestHandler):
