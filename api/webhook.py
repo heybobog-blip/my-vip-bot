@@ -28,7 +28,6 @@ ALL_ACCESS_ROOMS = [
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
-application = ApplicationBuilder().token(TOKEN).build()
 
 # =========================================================
 # ฟังก์ชันแกะซอง TrueMoney
@@ -82,7 +81,7 @@ def redeem_truemoney(url, phone_number):
         return {"status": "error", "message": str(e)}
 
 # =========================================================
-# Bot Handlers
+# Bot Handlers (Logic)
 # =========================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     WELCOME_TEXT = """
@@ -164,7 +163,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ เกิดข้อผิดพลาด (บอทอาจไม่ได้เป็นแอดมินกลุ่มนั้น)")
 
 # ===========================================================
-# ส่วน Server (แบบ Debug: ถ้าพังจะฟ้อง Error ออกมา)
+# ส่วน Server (สร้างบอทใหม่ทุกครั้ง - แก้ปัญหาบอทเงียบ)
 # ===========================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -174,20 +173,25 @@ class handler(BaseHTTPRequestHandler):
         try:
             json_string = post_body.decode('utf-8')
             update_data = json.loads(json_string)
-            print(f"📩 รับข้อความ: {json_string[:50]}...")
         except Exception as e:
-            print(f"❌ Error JSON: {e}")
             self.send_response(500)
             self.end_headers()
             return
 
         async def main():
-            try:
-                async with application:
-                    update = Update.de_json(update_data, application.bot)
-                    await application.process_update(update)
-            except Exception as e:
-                print(f"❌ บอทพัง (Runtime Error): {e}")
+            # [จุดสำคัญ] สร้าง Application ใหม่ทุกครั้งที่มี Request
+            app = ApplicationBuilder().token(TOKEN).build()
+            
+            # ลงทะเบียน Handler
+            app.add_handler(CommandHandler('start', start))
+            app.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_truemoney))
+            app.add_handler(MessageHandler(filters.PHOTO, reject_slip))
+            app.add_handler(CallbackQueryHandler(button_click))
+
+            # รันบอท
+            async with app:
+                update = Update.de_json(update_data, app.bot)
+                await app.process_update(update)
 
         try:
             asyncio.run(main())
@@ -196,7 +200,7 @@ class handler(BaseHTTPRequestHandler):
             asyncio.set_event_loop(loop)
             loop.run_until_complete(main())
         except Exception as e:
-            print(f"❌ Async Error: {e}")
+            print(f"❌ Error: {e}")
 
         self.send_response(200)
         self.end_headers()
