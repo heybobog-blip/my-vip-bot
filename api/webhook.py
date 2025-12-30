@@ -30,7 +30,7 @@ ALL_ACCESS_ROOMS = [
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 
 # =========================================================
-# ฟังก์ชันแกะซอง TrueMoney
+# ฟังก์ชันแกะซอง TrueMoney (ฉบับแก้ไข: กัน Error เรื่องชื่อหาย)
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -62,9 +62,16 @@ def redeem_truemoney(url, phone_number):
                 return {"status": "error", "message": f"Server Error ({response.status_code})"}
             return {"status": "error", "message": "Invalid Response"}
 
+        # เช็คสถานะความสำเร็จ
         if 'status' in data and data['status']['code'] == 'SUCCESS':
-            amount = float(data['data']['my_ticket']['amount_baht'])
-            sender_name = data['data']['owner_profile']['nickname']
+            # [จุดที่แก้] ใช้ .get() เพื่อป้องกัน Error ถ้าไม่มีข้อมูล
+            data_data = data.get('data', {})
+            ticket = data_data.get('my_ticket', {})
+            owner_profile = data_data.get('owner_profile', {})
+            
+            amount = float(ticket.get('amount_baht', 0))
+            sender_name = owner_profile.get('nickname', 'ไม่ระบุชื่อ') # ถ้าไม่มีชื่อ ให้ใช้คำว่า "ไม่ระบุชื่อ"
+            
             return {"status": "success", "amount": int(amount), "sender": sender_name}
         
         elif 'status' in data:
@@ -81,7 +88,7 @@ def redeem_truemoney(url, phone_number):
         return {"status": "error", "message": str(e)}
 
 # =========================================================
-# Bot Handlers (Logic)
+# Bot Handlers
 # =========================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     WELCOME_TEXT = """
@@ -121,9 +128,10 @@ async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if result['status'] == 'success':
         amount = result['amount']
+        sender_name = result['sender']
         
         try:
-            admin_text = f"💰 **บอทรับเงินสำเร็จ!**\nUser: {user.first_name}\nยอด: {amount}.-"
+            admin_text = f"💰 **บอทรับเงินสำเร็จ!**\nUser: {user.first_name}\nจากซอง: {sender_name}\nยอด: {amount}.-"
             await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text)
         except: pass
 
@@ -163,7 +171,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ เกิดข้อผิดพลาด (บอทอาจไม่ได้เป็นแอดมินกลุ่มนั้น)")
 
 # ===========================================================
-# ส่วน Server (สร้างบอทใหม่ทุกครั้ง - แก้ปัญหาบอทเงียบ)
+# ส่วน Server
 # ===========================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -179,16 +187,12 @@ class handler(BaseHTTPRequestHandler):
             return
 
         async def main():
-            # [จุดสำคัญ] สร้าง Application ใหม่ทุกครั้งที่มี Request
             app = ApplicationBuilder().token(TOKEN).build()
-            
-            # ลงทะเบียน Handler
             app.add_handler(CommandHandler('start', start))
             app.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_truemoney))
             app.add_handler(MessageHandler(filters.PHOTO, reject_slip))
             app.add_handler(CallbackQueryHandler(button_click))
 
-            # รันบอท
             async with app:
                 update = Update.de_json(update_data, app.bot)
                 await app.process_update(update)
