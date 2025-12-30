@@ -7,40 +7,36 @@ from http.server import BaseHTTPRequestHandler
 
 # =================ตั้งค่าข้อมูลระบบ=================
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_GROUP_ID = -5101530019
-QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 
+# [อัปเดต] ใส่เลขห้องแอดมินตัวใหม่ที่บอกมาครับ
+ADMIN_GROUP_ID = -1003614142313
+
+QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 
 # =========================================================
-# [ตั้งค่าห้อง] แยกกันระหว่าง แบบเลือกเอง (200/400) กับ แบบเหมา (999)
+# [ตั้งค่าห้องลูกค้า]
 # =========================================================
-
-# 1. สำหรับยอด 200 และ 400 (ลูกค้าต้องกดเลือกห้องเอง 1 ห้อง)
-# ใส่ ID ห้องจริงตรงนี้ได้เลยครับ
 SELECTABLE_ROOMS = {
     "200": [
         {"id": -1003465527678, "name": "VVIP V1"},
-        # {"id": -1003465527678, "name": "VVIP V2 "}  # <-- ถ้ามีห้องเลือกเพิ่ม
+        {"id": -1003465527678, "name": "VVIP V2"} # เพิ่มห้องได้
     ],
     "400": [
         {"id": -1003477489997, "name": "VVIP V1 SAVE"}
     ]
 }
 
-# 2. สำหรับยอด 999 (ได้เข้าทุกห้องอัตโนมัติ ไม่ต้องเลือก)
-# ใส่ ID ห้องที่ต้องการแจกให้คนจ่าย 999 ทั้งหมดที่นี่
 ALL_ACCESS_ROOMS = [
-    # {"id": -1003465527678, "name": "VVIP V1"},
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
-    # {"id": -100xxxxxxxxx, "name": "ห้อง VIP ถาวร"},
-    # {"id": -100xxxxxxxxx, "name": "ห้องน้องใหม่"}
+    {"id": -1003465527678, "name": "VVIP V1"}, # ถ้าจะแจกห้องนี้ด้วยให้เอา # ออก
 ]
 
 # เตรียมบอท
 application = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ข้อความต้อนรับ (แบบที่เลือกไว้)
     WELCOME_TEXT = """
 🔥 VVIP By.เซียนจู — ทีเด็ดงานดี ห้ามพลาด! 🔥
 
@@ -92,9 +88,17 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption_text = f"📩 **สลิปใหม่ (โอนธนาคาร)**\nชื่อ: {name}\nID: {user_id}\n\nตรวจสอบยอดแล้วกดปุ่ม:"
     
     try:
-        await context.bot.send_photo(chat_id=ADMIN_GROUP_ID, photo=update.message.photo[-1].file_id, caption=caption_text, reply_markup=reply_markup)
+        # ส่งไปห้องแอดมินใหม่
+        await context.bot.send_photo(
+            chat_id=ADMIN_GROUP_ID, 
+            photo=update.message.photo[-1].file_id, 
+            caption=caption_text, 
+            reply_markup=reply_markup
+        )
     except Exception as e:
-        print(f"Error sending to admin: {e}")
+        error_msg = f"❌ ส่งสลิปไปห้องแอดมินไม่ได้: {e}\n(เช็คว่าบอทอยู่ในกลุ่ม {ADMIN_GROUP_ID} หรือยัง?)"
+        print(error_msg)
+        # แจ้งเตือนแอดมินถ้าทำได้ หรือปล่อยผ่านลง log
 
 # ---------------------------------------------------------
 # ฟังก์ชันจัดการ: ลิ้งก์ซอง TrueMoney
@@ -124,29 +128,25 @@ async def handle_truemoney(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Error sending link to admin: {e}")
 
-
-# ===========================================================
-# ส่วนจัดการปุ่มกด (หัวใจหลักของระบบ)
-# ===========================================================
+# ---------------------------------------------------------
+# ฟังก์ชันจัดการปุ่มกด
+# ---------------------------------------------------------
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
     data = query.data
 
-    # -------------------------------------------------
-    # 1. แอดมินกดอนุมัติ
-    # -------------------------------------------------
+    # >>> แอดมินกดอนุมัติ
     if data.startswith("admin_approve_"):
         try:
             _, _, price, customer_id = data.split('_')
             customer_id = int(customer_id)
 
-            # >>> กรณี 999: ส่งลิ้งก์ให้ครบทุกห้องทันที (แบบเดิม) <<<
+            # กรณี 999 (เหมา)
             if price == "999":
                 links_keyboard = []
                 for group in ALL_ACCESS_ROOMS:
-                    # สร้างลิ้งก์
                     invite = await context.bot.create_chat_invite_link(
                         chat_id=group["id"],
                         member_limit=1,
@@ -163,7 +163,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 admin_status_text = "✅ อนุมัติ 999 (ส่งครบทุกห้องแล้ว)"
 
-            # >>> กรณี 200 หรือ 400: ส่งเมนูให้ลูกค้าเลือก (แบบใหม่) <<<
+            # กรณี 200/400 (เลือกเอง)
             else:
                 rooms = SELECTABLE_ROOMS.get(price, [])
                 if not rooms:
@@ -173,7 +173,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 customer_keyboard = []
                 for room in rooms:
                     btn_text = f"เลือกเข้า {room['name']}"
-                    # ส่งค่า select_room_IDห้อง_ราคา
                     callback_str = f"select_room_{room['id']}_{price}"
                     customer_keyboard.append([InlineKeyboardButton(btn_text, callback_data=callback_str)])
                 
@@ -186,7 +185,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 admin_status_text = f"✅ อนุมัติ {price} แล้ว (รอเกสเลือกห้อง)"
 
-            # อัปเดตข้อความในห้องแอดมิน
+            # อัปเดตข้อความห้องแอดมิน
             if query.message.caption:
                 await query.edit_message_caption(caption=f"{query.message.caption}\n\n{admin_status_text}")
             else:
@@ -196,27 +195,22 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"Admin Error: {e}")
             await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=f"❌ Error: {e}")
 
-    # -------------------------------------------------
-    # 2. ลูกค้ากดเลือกห้อง (เฉพาะยอด 200/400)
-    # -------------------------------------------------
+    # >>> ลูกค้ากดเลือกห้อง
     elif data.startswith("select_room_"):
         try:
             parts = data.split('_')
             target_group_id = int(parts[2])
             price_label = parts[3]
 
-            # สร้างลิ้งก์ห้องที่เลือก
             invite_link_obj = await context.bot.create_chat_invite_link(
                 chat_id=target_group_id, 
                 member_limit=1, 
                 name=f"VVIP {price_label} Selected"
             )
             
-            # ปุ่มลิ้งก์
             link_keyboard = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=invite_link_obj.invite_link)]]
             link_markup = InlineKeyboardMarkup(link_keyboard)
             
-            # แก้ไขข้อความเดิม ลบปุ่มเลือกทิ้ง แทนที่ด้วยลิ้งก์
             await query.edit_message_text(
                 text=f"✅ **เลือกห้องเรียบร้อย**\n\nกดปุ่มด้านล่างเพื่อเข้าห้องได้เลยครับ:\n(ลิ้งก์ใช้ได้ครั้งเดียว)",
                 reply_markup=link_markup
@@ -226,11 +220,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             print(f"Customer Error: {e}")
-            await context.bot.send_message(chat_id=query.from_user.id, text="❌ เกิดข้อผิดพลาดในการสร้างลิ้งก์ โปรดติดต่อแอดมิน")
-
+            await context.bot.send_message(chat_id=query.from_user.id, text="❌ เกิดข้อผิดพลาด (บอทอาจไม่ได้เป็นแอดมินในกลุ่มปลายทาง)")
 
 # ===========================================================
-# ส่วน Handler และ Server
+# Server
 # ===========================================================
 
 application.add_handler(CommandHandler('start', start))
