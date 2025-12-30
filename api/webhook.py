@@ -22,6 +22,7 @@ MY_PHONE_NUMBER = "0659325591"
 SELECTABLE_ROOMS = {
     "200": [
         {"id": -1003465527678, "name": "VVIP V1"},
+        {"id": -1003465527678, "name": "VVIP V2"},
     ],
     "400": [
         {"id": -1003477489997, "name": "VVIP V1 SAVE"}
