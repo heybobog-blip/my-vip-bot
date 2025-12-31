@@ -3,6 +3,7 @@ import json
 import asyncio
 import re
 import requests
+import random # เพิ่มตัวนี้มาช่วยสุ่มเลข
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from http.server import BaseHTTPRequestHandler
@@ -12,7 +13,7 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 ADMIN_GROUP_ID = -1003614142313
 MY_PHONE_NUMBER = "0659325591" 
 
-# ลิ้งก์ QR Code ของคุณ
+# ลิ้งก์ QR Code
 QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 
 # =================ตั้งค่าห้อง=================
@@ -28,22 +29,20 @@ SELECTABLE_ROOMS = {
 
 ALL_ACCESS_ROOMS = [
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
-    {"id": -1003465527678, "name": "VVIP V2"},
+    {"id": -1003465527678, "name": "VVIP V1"},
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
 
 # =========================================================
-# ระบบเช็คซอง TrueMoney (อัปเกรด Header แก้ Server Error)
+# ระบบเช็คซอง (Header ใหม่)
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
-        # 1. ตรวจสอบลิ้งก์
         match = re.search(r'v=([a-zA-Z0-9]+)', url)
         if not match: return {"status": "error", "message": "ลิ้งก์ผิดรูปแบบ"}
         voucher_code = match.group(1)
         
-        # 2. ตั้งค่าหัวข้อความให้เหมือนคนใช้ Chrome จริงๆ (แก้ Server Error)
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -54,19 +53,16 @@ def redeem_truemoney(url, phone_number):
         
         payload = {"mobile": phone_number, "voucher_hash": voucher_code}
         
-        # 3. ส่งคำขอไป TrueMoney
         response = requests.post(
             f"https://gift.truemoney.com/campaign/vouchers/{voucher_code}/redeem", 
             json=payload, headers=headers, timeout=30
         )
         
-        # 4. อ่านผลลัพธ์ (ดักจับ Error กรณีอ่าน JSON ไม่ได้)
         try:
             data = response.json()
         except json.JSONDecodeError:
-            return {"status": "error", "message": f"Server TrueMoney ไม่ตอบสนอง (Code: {response.status_code})"}
+            return {"status": "error", "message": f"Server TrueMoney ไม่ตอบสนอง ({response.status_code})"}
 
-        # 5. ตรวจสอบสถานะ
         if data.get('status', {}).get('code') == 'SUCCESS':
             d = data.get('data', {})
             amt = float(d.get('my_ticket', {}).get('amount_baht', 0))
@@ -79,7 +75,7 @@ def redeem_truemoney(url, phone_number):
         return {"status": "error", "message": str(e)}
 
 # =========================================================
-# ส่วนแสดงผล (Frontend & Menu)
+# ส่วนแสดงผล
 # =========================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,6 +107,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    user_id = query.from_user.id
 
     # 1. กดปุ่มแบบซอง
     if data == "mode_gift":
@@ -127,7 +124,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.message.reply_text(text)
 
-    # 2. กดปุ่มแบบ QR (ไม่โชว์เบอร์แล้ว ตามที่ขอ)
+    # 2. กดปุ่มแบบ QR (ซ่อนเบอร์)
     elif data == "mode_qr":
         caption = """
 📸 **สแกน QR Code นี้เพื่อชำระเงิน**
@@ -136,47 +133,64 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 (แอดมินจะตรวจสอบและกดอนุมัติให้ครับ)
 """
         await context.bot.send_photo(
-            chat_id=query.from_user.id,
+            chat_id=user_id,
             photo=QR_IMAGE_URL,
             caption=caption,
             parse_mode='Markdown'
         )
 
-    # 3. แอดมินกดอนุมัติ (หลังบ้าน)
+    # 3. แอดมินกดอนุมัติ
     elif data.startswith("ap_"):
         try:
-            _, price, user_id = data.split('_')
-            user_id = int(user_id)
+            _, price, target_id = data.split('_')
+            target_id = int(target_id)
+            
+            # สุ่มเลขต่อท้ายชื่อลิ้งก์ เพื่อให้ไม่ซ้ำแน่นอน
+            rnd = random.randint(1000,9999)
             
             if price == "999":
                 kb = []
                 for g in ALL_ACCESS_ROOMS:
-                    l = await context.bot.create_chat_invite_link(g["id"], member_limit=1, name=f"Man999_{user_id}")
+                    # สร้างลิ้งก์แบบระบุชื่อคน + เลขสุ่ม
+                    l = await context.bot.create_chat_invite_link(
+                        chat_id=g["id"], 
+                        member_limit=1, 
+                        name=f"Approve999_{target_id}_{rnd}"
+                    )
                     kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-                await context.bot.send_message(user_id, "✅ **แอดมินอนุมัติแล้ว (999)**\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb))
+                await context.bot.send_message(target_id, "✅ **แอดมินอนุมัติแล้ว (999)**\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb))
             
             elif price in SELECTABLE_ROOMS:
                 kb = []
                 for r in SELECTABLE_ROOMS[price]:
                     kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{price}")])
-                await context.bot.send_message(user_id, f"✅ **แอดมินอนุมัติแล้ว ({price})**\nเลือกห้องที่ต้องการ:", reply_markup=InlineKeyboardMarkup(kb))
+                await context.bot.send_message(target_id, f"✅ **แอดมินอนุมัติแล้ว ({price})**\nเลือกห้องที่ต้องการ:", reply_markup=InlineKeyboardMarkup(kb))
 
             await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ **อนุมัติเรียบร้อย**")
         except:
-            await query.message.reply_text("❌ ผิดพลาด (บอทอาจไม่ได้เป็นแอดมิน)")
+            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (บอทอาจไม่ได้เป็นแอดมิน)")
 
-    # 4. ลูกค้าเลือกห้อง
+    # 4. ลูกค้าเลือกห้อง (จุดสำคัญที่แก้ให้ลิ้งก์ใช้ครั้งเดียวชัวร์ๆ)
     elif data.startswith("sel_"):
         _, gid, price = data.split('_')
         try:
-            link = await context.bot.create_chat_invite_link(int(gid), member_limit=1, name=f"Final_{price}")
+            # สุ่มเลขต่อท้าย
+            rnd = random.randint(1000,9999)
+            link_name = f"User_{user_id}_{price}_{rnd}"
+            
+            link = await context.bot.create_chat_invite_link(
+                chat_id=int(gid), 
+                member_limit=1, 
+                name=link_name
+            )
+            
             kb = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=link.invite_link)]]
-            await query.edit_message_text(f"✅ **เลือกห้องเรียบร้อย**\nกดปุ่มด้านล่างเพื่อเข้าห้อง:", reply_markup=InlineKeyboardMarkup(kb))
-            await context.bot.send_message(query.from_user.id, THANK_YOU_TEXT)
+            await query.edit_message_text(f"✅ **เลือกห้องเรียบร้อย**\nกดปุ่มด้านล่างเพื่อเข้าห้อง:\n(ลิ้งก์ใช้ได้ครั้งเดียว)", reply_markup=InlineKeyboardMarkup(kb))
+            await context.bot.send_message(user_id, THANK_YOU_TEXT)
         except:
-            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ")
+            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (โปรดเช็คว่าบอทเป็นแอดมินห้องนั้นหรือยัง)")
 
-# รับรูปสลิป (QR Mode) -> ส่งให้แอดมินกด
+# รับรูปสลิป
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     kb = [
@@ -189,7 +203,7 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_photo(ADMIN_GROUP_ID, update.message.photo[-1].file_id, caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
     await update.message.reply_text("⏳ **ได้รับสลิปแล้ว** รอแอดมินกดยืนยันสักครู่นะครับ...")
 
-# รับลิ้งก์ซอง (Gift Mode) -> ออโต้ 100%
+# รับลิ้งก์ซอง
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user = update.message.from_user
@@ -202,10 +216,17 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await context.bot.send_message(ADMIN_GROUP_ID, f"💰 **Auto Success!**\nUser: {user.first_name}\nยอด: {amt}")
         except: pass
         
+        # สุ่มเลขกันลิ้งก์ซ้ำ
+        rnd = random.randint(1000,9999)
+
         if amt >= 999:
             kb = []
             for g in ALL_ACCESS_ROOMS:
-                l = await context.bot.create_chat_invite_link(g["id"], member_limit=1, name=f"Auto999_{user.id}")
+                l = await context.bot.create_chat_invite_link(
+                    chat_id=g["id"], 
+                    member_limit=1, 
+                    name=f"Auto999_{user.id}_{rnd}"
+                )
                 kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**", reply_markup=InlineKeyboardMarkup(kb))
         elif str(amt) in SELECTABLE_ROOMS:
@@ -219,7 +240,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {res['message']}")
 
 # ===========================================================
-# Server (บังคับสร้างบอทใหม่ทุกครั้ง ป้องกันบอทหลับ)
+# Server
 # ===========================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
