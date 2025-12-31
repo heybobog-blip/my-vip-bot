@@ -20,7 +20,7 @@ QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
 SELECTABLE_ROOMS = {
     "200": [
         {"id": -1003465527678, "name": "VVIP V1"},
-        {"id": -1003465527678, "name": "VVIP V2"},
+        # {"id": -1003465527678, "name": "VVIP V2"},
     ],
     "400": [
         {"id": -1003477489997, "name": "VVIP V1 SAVE"}
@@ -29,7 +29,7 @@ SELECTABLE_ROOMS = {
 
 ALL_ACCESS_ROOMS = [
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
-    {"id": -1003465527678, "name": "VVIP V1"},
+    # {"id": -1003465527678, "name": "VVIP V1"},
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
