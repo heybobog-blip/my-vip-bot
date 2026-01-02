@@ -101,7 +101,7 @@ async def send_main_menu(update, context, is_edit=False):
 ━━━━━━━━━━━━━━━━━━
 💎 RATE PRICE (แพ็กเกจ) 💎
 
-👑 999 บาท (All VVIP) 🔥🔥🔥
+👑 999 บาท (ALL VVIP) 🔥🔥🔥
 └ คุ้มที่สุด! จ่ายครั้งเดียวจบ เข้าได้ทุกกลุ่มยันชาติหน้า
 
 🥈 400 บาท (VVIP SAVE)
