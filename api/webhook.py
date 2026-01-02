@@ -97,7 +97,7 @@ def redeem_truemoney(url, phone_number):
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
 ✨ ยินดีต้อนรับสู่... ✨
-🔥 VVIP ของกลุ่ม18+คุยได้ (เซียนจู เจริญPORN) 🔥
+🔥 VVIP (เซียนจู เจริญPORN) 🔥
 ━━━━━━━━━━━━━━━━━━
 💎 RATE PRICE (แพ็กเกจ) 💎
 
