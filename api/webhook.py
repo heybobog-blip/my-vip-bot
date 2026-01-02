@@ -3,27 +3,26 @@ import json
 import asyncio
 import re
 import requests
-import random # เพิ่มตัวนี้มาช่วยสุ่มเลข
+import random
+from datetime import datetime
+import pytz # ใช้สำหรับเวลาไทย
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from http.server import BaseHTTPRequestHandler
 
 # =================ตั้งค่าข้อมูลระบบ=================
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_GROUP_ID = -1003614142313
-MY_PHONE_NUMBER = "0659325591" 
+ADMIN_GROUP_ID = -1003614142313 # เลขห้องแอดมิน
+MY_PHONE_NUMBER = "0659325591"  # เบอร์รับเงิน
 
-# ลิ้งก์ QR Code
-QR_IMAGE_URL = 'https://img2.pic.in.th/photo_2025-12-29_21-12-44.jpg'
-
-# =================ตั้งค่าห้อง=================
+# =================ตั้งค่าห้อง (เช็คเลขห้องให้ถูกต้องนะครับ)=================
 SELECTABLE_ROOMS = {
     "200": [
-        {"id": -1003465527678, "name": "VVIP V1"},
+        {"id": -1003465527678, "name": "VVIP V1 (200)"},
         # {"id": -1003465527678, "name": "VVIP V2"},
     ],
     "400": [
-        {"id": -1003477489997, "name": "VVIP V1 SAVE"}
+        {"id": -1003477489997, "name": "VVIP V1 SAVE (400)"}
     ]
 }
 
@@ -32,10 +31,10 @@ ALL_ACCESS_ROOMS = [
     # {"id": -1003465527678, "name": "VVIP V1"},
 ]
 
-THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ต ฝากพิมพ์ +1 และ รีวิวในกลุ่ม VVIP ด้วยนะครับ"
+THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
-# ระบบเช็คซอง (Header ใหม่)
+# ระบบเช็คซอง (พร้อมฟังก์ชันเซ็นเซอร์นามสกุล)
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -66,8 +65,24 @@ def redeem_truemoney(url, phone_number):
         if data.get('status', {}).get('code') == 'SUCCESS':
             d = data.get('data', {})
             amt = float(d.get('my_ticket', {}).get('amount_baht', 0))
-            sender = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
-            return {"status": "success", "amount": int(amt), "sender": sender}
+            full_name = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
+            voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code) # เก็บ Hash ไว้โชว์
+
+            # --- จัดการชื่อ (เซ็นเซอร์นามสกุล) ---
+            # เช่น "สมชาย เข็มกลัด" -> "สมชาย ***"
+            # เช่น "สมชาย" -> "สมชาย"
+            name_parts = full_name.split()
+            if len(name_parts) > 1:
+                masked_name = f"{name_parts[0]} ***"
+            else:
+                masked_name = full_name
+            
+            return {
+                "status": "success", 
+                "amount": int(amt), 
+                "sender_masked": masked_name,
+                "hash": voucher_hash
+            }
         else:
             return {"status": "error", "message": data.get('status', {}).get('code', 'Unknown Error')}
             
@@ -75,33 +90,54 @@ def redeem_truemoney(url, phone_number):
         return {"status": "error", "message": str(e)}
 
 # =========================================================
-# ส่วนแสดงผล
+# ส่วนแสดงผล (Frontend)
 # =========================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ฟังก์ชันหน้าเมนูหลัก (แยกออกมาเพื่อให้เรียกใช้ซ้ำได้ตอนกดปุ่มกลับ)
+async def send_main_menu(update, context, is_edit=False):
     TEXT = """
-🔥 **VVIP By.เซียนจู — ยินดีต้อนรับครับ** 🔥
+✨ **ยินดีต้อนรับสู่...** ✨
+🔥 **VVIP 18+ คุยได้ (เจริญPORN)** 🔥
+━━━━━━━━━━━━━━━━━━
+💎 **RATE PRICE (แพ็กเกจ)** 💎
 
-💎 **เรทราคาค่าเข้า**
-▪️ **200.-** (ดูอย่างเดียว)
-▪️ **400.-** (ดู + เซฟได้ 💾)
-🏆 **999.-** (เหมาถาวร เข้าทุกกลุ่ม)
+👑 **999 บาท (SSSVIP) 🔥🔥🔥**
+└ คุ้มที่สุด! จ่ายครั้งเดียวจบ เข้าได้ทุกกลุ่มยันชาติหน้า
 
-👇 **กรุณาเลือกวิธีการซื้อ:**
+🥈 **400 บาท (SVIP)**
+└ สายเก็บ เซฟได้ไม่อั้น (กลุ่ม Save)
+
+🥉 **200 บาท (VIP)**
+└ กลุ่มธรรมดา (ดูได้อย่างเดียว เซฟไม่ได้)
+━━━━━━━━━━━━━━━━━━
+🤖 **ระบบจ่ายเงินอัตโนมัติ (Auto Bot)** 🤖
+รวดเร็ว ไม่ต้องรอแอดมินตอบ!
+📝 **วิธีใช้งานบอทชำระเงิน**
+`1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"`
+`2. อ่านวิธีทำซอง และสร้างลิงก์`
+`3. ส่งลิงก์ซองเข้ามาในแชทนี้`
+
+❓ **ติดปัญหา / มีคำถาม?**
+หากโอนเงินแล้วไม่ได้รับลิ้งค์ หรือต้องการสอบถามเพิ่มเติม
+👉 **กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง เพื่อติดต่อแอดมินโดยตรงครับ** 👇
 """
     keyboard = [
-        [InlineKeyboardButton("🧧 ซื้อแบบซอง (เข้ากลุ่มอัตโนมัติ)", callback_data="mode_gift")],
-        [InlineKeyboardButton("🏦 ซื้อแบบสแกน QR (โอนธนาคาร)", callback_data="mode_qr")],
-        [InlineKeyboardButton("💬 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001")],
-        [InlineKeyboardButton("💬 ซื้อกับแอดมิน 2", url="https://t.me/duded16")]
+        [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
+        [InlineKeyboardButton("🛒 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("🛒 ซื้อกับแอดมิน 2", url="https://t.me/duded16")],
+        [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+5sWrRGBIm3Y5ODE1")]
     ]
     
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=TEXT,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if is_edit:
+        # ถ้าเป็นการกดปุ่มย้อนกลับ ให้แก้ไขข้อความเดิม
+        await update.callback_query.edit_message_text(text=TEXT, reply_markup=reply_markup, parse_mode='Markdown')
+    else:
+        # ถ้าเป็นการพิมพ์ /start ใหม่
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=TEXT, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_main_menu(update, context, is_edit=False)
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -109,134 +145,106 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # 1. กดปุ่มแบบซอง
+    # 1. กดปุ่ม "จ่ายด้วยซอง" -> แสดงวิธีทำ + ปุ่มกลับ
     if data == "mode_gift":
         text = """
-🧧 **วิธีจ่ายด้วยซองของขวัญ (ระบบออโต้)**
+📝 **วิธีชำระเงินด้วยซองของขวัญ (ระบบออโต้)**
+➖➖➖➖➖➖➖➖➖➖
+1️⃣ เข้าแอป TrueMoney Wallet เลือกเมนู **'ซองของขวัญ'**
+2️⃣ ใส่ยอดเงินตามแพ็กเกจที่เลือก **(200, 400 หรือ 999)**
+3️⃣ เลือกประเภท **'แบ่งจำนวนเงินเท่ากัน'**
+4️⃣ ใส่จำนวนคนรับเป็น **1 คน**
+5️⃣ กดสร้างซอง > **คัดลอกลิ้งก์**
 
-1. เข้าแอป TrueMoney เลือก "ส่งซองของขวัญ"
-2. ใส่ยอดเงิน (200, 400, 999)
-3. เลือก "แบ่งจำนวนเงินเท่ากัน"
-4. จำนวนคนรับซอง: **1 คน**
-5. **ส่งลิ้งก์ซอง** มาในแชทนี้ได้เลยครับ
-
-(ระบบจะดึงเข้ากลุ่มทันที ไม่ต้องรอแอดมิน)
+🚀 **นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะดึงเข้ากลุ่มทันที**
 """
-        await query.message.reply_text(text)
+        # ปุ่มย้อนกลับ
+        kb = [[InlineKeyboardButton("🔙 กลับเมนูหลัก", callback_data="back_main")]]
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
 
-    # 2. กดปุ่มแบบ QR (ซ่อนเบอร์)
-    elif data == "mode_qr":
-        caption = """
-📸 **สแกน QR Code นี้เพื่อชำระเงิน**
+    # 2. กดปุ่ม "กลับเมนูหลัก"
+    elif data == "back_main":
+        await send_main_menu(update, context, is_edit=True)
 
-เมื่อโอนเสร็จแล้ว ให้ส่ง **"รูปสลิป"** เข้ามาในแชทนี้ครับ
-(แอดมินจะตรวจสอบและกดอนุมัติให้ครับ)
-"""
-        await context.bot.send_photo(
-            chat_id=user_id,
-            photo=QR_IMAGE_URL,
-            caption=caption,
-            parse_mode='Markdown'
-        )
-
-    # 3. แอดมินกดอนุมัติ
-    elif data.startswith("ap_"):
-        try:
-            _, price, target_id = data.split('_')
-            target_id = int(target_id)
-            
-            # สุ่มเลขต่อท้ายชื่อลิ้งก์ เพื่อให้ไม่ซ้ำแน่นอน
-            rnd = random.randint(1000,9999)
-            
-            if price == "999":
-                kb = []
-                for g in ALL_ACCESS_ROOMS:
-                    # สร้างลิ้งก์แบบระบุชื่อคน + เลขสุ่ม
-                    l = await context.bot.create_chat_invite_link(
-                        chat_id=g["id"], 
-                        member_limit=1, 
-                        name=f"Approve999_{target_id}_{rnd}"
-                    )
-                    kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-                await context.bot.send_message(target_id, "✅ **แอดมินอนุมัติแล้ว (999)**\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb))
-            
-            elif price in SELECTABLE_ROOMS:
-                kb = []
-                for r in SELECTABLE_ROOMS[price]:
-                    kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{price}")])
-                await context.bot.send_message(target_id, f"✅ **แอดมินอนุมัติแล้ว ({price})**\nเลือกห้องที่ต้องการ:", reply_markup=InlineKeyboardMarkup(kb))
-
-            await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ **อนุมัติเรียบร้อย**")
-        except:
-            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (บอทอาจไม่ได้เป็นแอดมิน)")
-
-    # 4. ลูกค้าเลือกห้อง (จุดสำคัญที่แก้ให้ลิ้งก์ใช้ครั้งเดียวชัวร์ๆ)
+    # 3. เลือกห้อง (Logic เดิม: สุ่มเลขกันลิ้งก์ซ้ำ)
     elif data.startswith("sel_"):
-        _, gid, price = data.split('_')
         try:
-            # สุ่มเลขต่อท้าย
+            _, gid, price = data.split('_')
             rnd = random.randint(1000,9999)
             link_name = f"User_{user_id}_{price}_{rnd}"
             
             link = await context.bot.create_chat_invite_link(
-                chat_id=int(gid), 
-                member_limit=1, 
-                name=link_name
+                chat_id=int(gid), member_limit=1, name=link_name
             )
             
             kb = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=link.invite_link)]]
             await query.edit_message_text(f"✅ **เลือกห้องเรียบร้อย**\nกดปุ่มด้านล่างเพื่อเข้าห้อง:\n(ลิ้งก์ใช้ได้ครั้งเดียว)", reply_markup=InlineKeyboardMarkup(kb))
             await context.bot.send_message(user_id, THANK_YOU_TEXT)
-        except:
-            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (โปรดเช็คว่าบอทเป็นแอดมินห้องนั้นหรือยัง)")
+        except Exception as e:
+            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (บอทอาจไม่ได้เป็นแอดมินห้องนั้น)")
 
-# รับรูปสลิป
-async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    kb = [
-        [InlineKeyboardButton("✅ 200", callback_data=f"ap_200_{user.id}"),
-         InlineKeyboardButton("✅ 400", callback_data=f"ap_400_{user.id}")],
-        [InlineKeyboardButton("🏆 999", callback_data=f"ap_999_{user.id}")]
-    ]
-    caption = f"📩 **สลิปใหม่**\nจาก: {user.first_name}\nID: `{user.id}`\n\nตรวจสอบยอดแล้วกดปุ่ม:"
-    
-    await context.bot.send_photo(ADMIN_GROUP_ID, update.message.photo[-1].file_id, caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-    await update.message.reply_text("⏳ **ได้รับสลิปแล้ว** รอแอดมินกดยืนยันสักครู่นะครับ...")
-
-# รับลิ้งก์ซอง
+# รับลิ้งก์ซอง (Auto)
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
     
+    # เช็คซอง
     res = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
     
     if res['status'] == 'success':
         amt = res['amount']
-        try: await context.bot.send_message(ADMIN_GROUP_ID, f"💰 **Auto Success!**\nUser: {user.first_name}\nยอด: {amt}")
+        sender_masked = res['sender_masked']
+        v_hash = res.get('hash', 'N/A')
+        
+        # --- ส่งรายงานเข้าห้องแอดมิน (ตามรูปแบบที่ขอ) ---
+        tz = pytz.timezone('Asia/Bangkok')
+        now = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+        
+        admin_report = f"""
+🎁 **รายงานรับซอง (Auto)**
+🕒 เวลา: {now}
+
+💰 **ข้อมูลการเงิน**
+💵 ยอดเงิน: {amt} บาท
+👤 ชื่อทรูมันนี่: {sender_masked}
+🎫 Hash: `{v_hash}`
+
+👤 **ข้อมูลลูกค้า**
+📛 ชื่อ: {user.first_name}
+🆔 User: @{user.username if user.username else 'ไม่ระบุ'}
+🔢 ID: `{user.id}`
+🏳️ ภาษา: {user.language_code}
+⭐ สถานะ: User ทั่วไป
+
+สถานะ: ✅ **บอทอนุมัติแล้ว ({amt})**
+"""
+        try: 
+            await context.bot.send_message(ADMIN_GROUP_ID, admin_report, parse_mode='Markdown')
         except: pass
         
-        # สุ่มเลขกันลิ้งก์ซ้ำ
+        # --- จัดการฝั่งลูกค้า (ส่งปุ่มเข้าห้อง) ---
         rnd = random.randint(1000,9999)
 
         if amt >= 999:
             kb = []
             for g in ALL_ACCESS_ROOMS:
                 l = await context.bot.create_chat_invite_link(
-                    chat_id=g["id"], 
-                    member_limit=1, 
-                    name=f"Auto999_{user.id}_{rnd}"
+                    chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}"
                 )
                 kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**", reply_markup=InlineKeyboardMarkup(kb))
+            
         elif str(amt) in SELECTABLE_ROOMS:
             kb = []
             for r in SELECTABLE_ROOMS[str(amt)]:
                 kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{amt}")])
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**\nเลือกห้อง:", reply_markup=InlineKeyboardMarkup(kb))
+            
         else:
-            await msg.edit_text(f"✅ รับยอด {amt} บาท (ยอดไม่ตรงแพ็กเกจ) ติดต่อแอดมิน")
+            await msg.edit_text(f"✅ รับยอด {amt} บาท (ยอดไม่ตรงแพ็กเกจ) โปรดติดต่อแอดมิน")
     else:
+        # กรณีรับไม่ได้
         await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {res['message']}")
 
 # ===========================================================
@@ -253,7 +261,6 @@ class handler(BaseHTTPRequestHandler):
             app = ApplicationBuilder().token(TOKEN).build()
             app.add_handler(CommandHandler('start', start))
             app.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_gift))
-            app.add_handler(MessageHandler(filters.PHOTO, handle_slip))
             app.add_handler(CallbackQueryHandler(button_click))
             async with app: await app.process_update(Update.de_json(update_data, app.bot))
 
