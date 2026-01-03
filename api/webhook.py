@@ -5,21 +5,25 @@ import re
 import requests
 import random
 from datetime import datetime
-import pytz # ใช้สำหรับเวลาไทย
+import pytz 
+import gspread # เพิ่มตัวนี้
+from oauth2client.service_account import ServiceAccountCredentials # เพิ่มตัวนี้
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from http.server import BaseHTTPRequestHandler
 
 # =================ตั้งค่าข้อมูลระบบ=================
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_GROUP_ID = -1003614142313 # เลขห้องแอดมิน
-MY_PHONE_NUMBER = "0659325591"  # เบอร์รับเงิน
+ADMIN_GROUP_ID = -1003614142313 
+MY_PHONE_NUMBER = "0659325591"  
 
-# =================ตั้งค่าห้อง (เช็คเลขห้องให้ถูกต้องนะครับ)=================
+# ชื่อไฟล์ Google Sheet ที่คุณตั้งไว้ (ต้องตรงเป๊ะๆ)
+SHEET_NAME = "VVIP_Data" 
+
+# =================ตั้งค่าห้อง=================
 SELECTABLE_ROOMS = {
     "200": [
         {"id": -1003465527678, "name": "VVIP V1 (200)"},
-        # {"id": -1003465527678, "name": "VVIP V2"},
     ],
     "400": [
         {"id": -1003477489997, "name": "VVIP V1 SAVE (400)"}
@@ -28,13 +32,41 @@ SELECTABLE_ROOMS = {
 
 ALL_ACCESS_ROOMS = [
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
-    # {"id": -1003465527678, "name": "VVIP V1"},
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
-# ระบบเช็คซอง (พร้อมฟังก์ชันเซ็นเซอร์นามสกุล)
+# ฟังก์ชันบันทึกลง Google Sheet
+# =========================================================
+def save_to_google_sheet(data_row):
+    try:
+        # ดึงกุญแจจาก Vercel Environment Variable
+        creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+        if not creds_json:
+            print("❌ ไม่พบ GOOGLE_CREDENTIALS ในตั้งค่า Vercel")
+            return
+
+        # เชื่อมต่อ Google Sheets
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+                 "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+        
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        
+        # เปิดไฟล์ Sheet
+        sheet = client.open(SHEET_NAME).sheet1
+        
+        # เพิ่มแถวใหม่
+        sheet.append_row(data_row)
+        print("✅ บันทึกข้อมูลลง Sheet เรียบร้อย")
+        
+    except Exception as e:
+        print(f"❌ บันทึก Sheet ไม่สำเร็จ: {e}")
+
+# =========================================================
+# ระบบเช็คซอง 
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -66,11 +98,8 @@ def redeem_truemoney(url, phone_number):
             d = data.get('data', {})
             amt = float(d.get('my_ticket', {}).get('amount_baht', 0))
             full_name = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
-            voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code) # เก็บ Hash ไว้โชว์
+            voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code) 
 
-            # --- จัดการชื่อ (เซ็นเซอร์นามสกุล) ---
-            # เช่น "สมชาย เข็มกลัด" -> "สมชาย ***"
-            # เช่น "สมชาย" -> "สมชาย"
             name_parts = full_name.split()
             if len(name_parts) > 1:
                 masked_name = f"{name_parts[0]} ***"
@@ -81,6 +110,7 @@ def redeem_truemoney(url, phone_number):
                 "status": "success", 
                 "amount": int(amt), 
                 "sender_masked": masked_name,
+                "full_name": full_name, # ส่งชื่อเต็มไปบันทึก
                 "hash": voucher_hash
             }
         else:
@@ -93,48 +123,43 @@ def redeem_truemoney(url, phone_number):
 # ส่วนแสดงผล (Frontend)
 # =========================================================
 
-# ฟังก์ชันหน้าเมนูหลัก (แยกออกมาเพื่อให้เรียกใช้ซ้ำได้ตอนกดปุ่มกลับ)
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
-✨ ยินดีต้อนรับสู่... ✨
-🔥 VVIP (เซียนจู เจริญPORN) 🔥
+✨ **ยินดีต้อนรับสู่...** ✨
+🔥 **VVIP 18+ คุยได้ (เจริญPORN)** 🔥
 ━━━━━━━━━━━━━━━━━━
-💎 RATE PRICE (แพ็กเกจ) 💎
+💎 **RATE PRICE (แพ็กเกจ)** 💎
 
-👑 999 บาท (ALL VVIP) 🔥🔥🔥
+👑 **999 บาท (SSSVIP) 🔥🔥🔥**
 └ คุ้มที่สุด! จ่ายครั้งเดียวจบ เข้าได้ทุกกลุ่มยันชาติหน้า
 
-🥈 400 บาท (VVIP SAVE)
+🥈 **400 บาท (SVIP)**
 └ สายเก็บ เซฟได้ไม่อั้น (กลุ่ม Save)
 
-🥉 200 บาท (VVIP)
+🥉 **200 บาท (VIP)**
 └ กลุ่มธรรมดา (ดูได้อย่างเดียว เซฟไม่ได้)
 ━━━━━━━━━━━━━━━━━━
-🧧 ระบบจ่ายเงินอัตโนมัติ (Auto) 🧧
+🤖 **ระบบจ่ายเงินอัตโนมัติ (Auto Bot)** 🤖
 รวดเร็ว ไม่ต้องรอแอดมินตอบ!
+📝 **วิธีใช้งานบอทชำระเงิน**
+`1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"`
+`2. อ่านวิธีทำซอง และสร้างลิงก์`
+`3. ส่งลิงก์ซองเข้ามาในแชทนี้`
 
-📝 วิธีใช้งานบอทชำระเงิน
-1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"
-2. อ่านวิธีทำซอง และสร้างลิงก์
-3. ส่งลิงก์ซองเข้ามาในแชทนี้
-
-❓ ติดปัญหา / มีคำถาม?
+❓ **ติดปัญหา / มีคำถาม?**
 หากโอนเงินแล้วไม่ได้รับลิ้งค์ หรือต้องการสอบถามเพิ่มเติม
-👉 กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง เพื่อติดต่อแอดมินโดยตรงครับ 👇
+👉 **กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง เพื่อติดต่อแอดมินโดยตรงครับ** 👇
 """
     keyboard = [
         [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
-        [InlineKeyboardButton("🛒 ซื้อกับแอดจู", url="https://t.me/ZeinJu001"), InlineKeyboardButton("🛒 ซื้อกับแอดดู๋", url="https://t.me/duded16")],
+        [InlineKeyboardButton("🛒 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("🛒 ซื้อกับแอดมิน 2", url="https://t.me/duded16")],
         [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+5sWrRGBIm3Y5ODE1")]
     ]
-    
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if is_edit:
-        # ถ้าเป็นการกดปุ่มย้อนกลับ ให้แก้ไขข้อความเดิม
         await update.callback_query.edit_message_text(text=TEXT, reply_markup=reply_markup, parse_mode='Markdown')
     else:
-        # ถ้าเป็นการพิมพ์ /start ใหม่
         await context.bot.send_message(chat_id=update.effective_chat.id, text=TEXT, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -146,7 +171,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
 
-    # 1. กดปุ่ม "จ่ายด้วยซอง" -> แสดงวิธีทำ + ปุ่มกลับ
     if data == "mode_gift":
         text = """
 📝 **วิธีชำระเงินด้วยซองของขวัญ (ระบบออโต้)**
@@ -157,54 +181,59 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 4️⃣ ใส่จำนวนคนรับเป็น **1 คน**
 5️⃣ กดสร้างซอง > **คัดลอกลิ้งก์**
 
-🚀 **นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะส่งกลุ่มให้ทันที**
+🚀 **นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะดึงเข้ากลุ่มทันที**
 """
-        # ปุ่มย้อนกลับ
         kb = [[InlineKeyboardButton("🔙 กลับเมนูหลัก", callback_data="back_main")]]
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
 
-    # 2. กดปุ่ม "กลับเมนูหลัก"
     elif data == "back_main":
         await send_main_menu(update, context, is_edit=True)
 
-    # 3. เลือกห้อง (Logic เดิม: สุ่มเลขกันลิ้งก์ซ้ำ)
     elif data.startswith("sel_"):
         try:
             _, gid, price = data.split('_')
             rnd = random.randint(1000,9999)
             link_name = f"User_{user_id}_{price}_{rnd}"
-            
-            link = await context.bot.create_chat_invite_link(
-                chat_id=int(gid), member_limit=1, name=link_name
-            )
-            
+            link = await context.bot.create_chat_invite_link(chat_id=int(gid), member_limit=1, name=link_name)
             kb = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=link.invite_link)]]
             await query.edit_message_text(f"✅ **เลือกห้องเรียบร้อย**\nกดปุ่มด้านล่างเพื่อเข้าห้อง:\n(ลิ้งก์ใช้ได้ครั้งเดียว)", reply_markup=InlineKeyboardMarkup(kb))
             await context.bot.send_message(user_id, THANK_YOU_TEXT)
         except Exception as e:
-            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (บอทอาจไม่ได้เป็นแอดมินห้องนั้น)")
+            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ")
 
-# รับลิ้งก์ซอง (Auto)
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
     
-    # เช็คซอง
     res = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
     
     if res['status'] == 'success':
         amt = res['amount']
         sender_masked = res['sender_masked']
+        full_name = res.get('full_name', 'ไม่ระบุ')
         v_hash = res.get('hash', 'N/A')
         
-        # --- ส่งรายงานเข้าห้องแอดมิน (ตามรูปแบบที่ขอ) ---
+        # --- เตรียมข้อมูลเวลา ---
         tz = pytz.timezone('Asia/Bangkok')
-        now = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+        now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+
+        # --- 📝 บันทึกลง Google Sheet (ทำงานเบื้องหลัง) ---
+        sheet_data = [
+            now_str,                # A: เวลา
+            amt,                    # B: ยอดเงิน
+            user.first_name,        # C: ชื่อลูกค้าใน Telegram
+            str(user.id),           # D: ID ลูกค้า
+            full_name,              # E: ชื่อ TrueMoney (ชื่อเต็ม)
+            v_hash                  # F: Hash
+        ]
+        # เรียกฟังก์ชันบันทึก
+        await asyncio.to_thread(save_to_google_sheet, sheet_data)
         
+        # --- ส่งรายงานแอดมิน ---
         admin_report = f"""
 🎁 **รายงานรับซอง (Auto)**
-🕒 เวลา: {now}
+🕒 เวลา: {now_str}
 
 💰 **ข้อมูลการเงิน**
 💵 ยอดเงิน: {amt} บาท
@@ -215,42 +244,31 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📛 ชื่อ: {user.first_name}
 🆔 User: @{user.username if user.username else 'ไม่ระบุ'}
 🔢 ID: `{user.id}`
-🏳️ ภาษา: {user.language_code}
 ⭐ สถานะ: User ทั่วไป
 
 สถานะ: ✅ **บอทอนุมัติแล้ว ({amt})**
 """
-        try: 
-            await context.bot.send_message(ADMIN_GROUP_ID, admin_report, parse_mode='Markdown')
+        try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, parse_mode='Markdown')
         except: pass
         
-        # --- จัดการฝั่งลูกค้า (ส่งปุ่มเข้าห้อง) ---
+        # --- ส่งของให้ลูกค้า ---
         rnd = random.randint(1000,9999)
-
         if amt >= 999:
             kb = []
             for g in ALL_ACCESS_ROOMS:
-                l = await context.bot.create_chat_invite_link(
-                    chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}"
-                )
+                l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}")
                 kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**", reply_markup=InlineKeyboardMarkup(kb))
-            
         elif str(amt) in SELECTABLE_ROOMS:
             kb = []
             for r in SELECTABLE_ROOMS[str(amt)]:
                 kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{amt}")])
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**\nเลือกห้อง:", reply_markup=InlineKeyboardMarkup(kb))
-            
         else:
             await msg.edit_text(f"✅ รับยอด {amt} บาท (ยอดไม่ตรงแพ็กเกจ) โปรดติดต่อแอดมิน")
     else:
-        # กรณีรับไม่ได้
         await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {res['message']}")
 
-# ===========================================================
-# Server
-# ===========================================================
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_len = int(self.headers.get('Content-Length'))
