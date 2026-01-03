@@ -1,3 +1,5 @@
 python-telegram-bot
 requests
 pytz
+gspread
+oauth2client
