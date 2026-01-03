@@ -6,8 +6,8 @@ import requests
 import random
 from datetime import datetime
 import pytz 
-import gspread # เพิ่มตัวนี้
-from oauth2client.service_account import ServiceAccountCredentials # เพิ่มตัวนี้
+import gspread 
+from oauth2client.service_account import ServiceAccountCredentials 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from http.server import BaseHTTPRequestHandler
@@ -17,14 +17,14 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 ADMIN_GROUP_ID = -1003614142313 
 MY_PHONE_NUMBER = "0659325591"  
 
-# ชื่อไฟล์ Google Sheet ที่คุณตั้งไว้ (ต้องตรงเป๊ะๆ)
+# ชื่อไฟล์ Google Sheet
 SHEET_NAME = "VVIP_Data" 
 
 # =================ตั้งค่าห้อง=================
 SELECTABLE_ROOMS = {
     "200": [
         {"id": -1003465527678, "name": "VVIP V1"},
-        # {"id": IDห้องใหม่จากบอท @userinfobot , "name": "VVIP V2"},
+        # {"id": IDห้องใหม่จากบอท @userinfobot, "name": "VVIP V2"},
     ],
     "400": [
         {"id": -1003477489997, "name": "VVIP V1 SAVE"}
@@ -33,23 +33,21 @@ SELECTABLE_ROOMS = {
 
 ALL_ACCESS_ROOMS = [
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
-    # {"id": IDห้องใหม่จากบอท @userinfobot , "name": "VVIP V2"},
+    # {"id": IDห้องใหม่จากบอท @userinfobot, "name": "VVIP V2"},
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
-# ฟังก์ชันบันทึกลง Google Sheet
+# ฟังก์ชันบันทึกลง Google Sheet (เก็บครบทุกเม็ด)
 # =========================================================
 def save_to_google_sheet(data_row):
     try:
-        # ดึงกุญแจจาก Vercel Environment Variable
         creds_json = os.environ.get("GOOGLE_CREDENTIALS")
         if not creds_json:
-            print("❌ ไม่พบ GOOGLE_CREDENTIALS ในตั้งค่า Vercel")
+            print("❌ ไม่พบ GOOGLE_CREDENTIALS")
             return
 
-        # เชื่อมต่อ Google Sheets
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
                  "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
         
@@ -57,18 +55,15 @@ def save_to_google_sheet(data_row):
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         
-        # เปิดไฟล์ Sheet
         sheet = client.open(SHEET_NAME).sheet1
-        
-        # เพิ่มแถวใหม่
         sheet.append_row(data_row)
-        print("✅ บันทึกข้อมูลลง Sheet เรียบร้อย")
+        print("✅ บันทึก Sheet สำเร็จ")
         
     except Exception as e:
         print(f"❌ บันทึก Sheet ไม่สำเร็จ: {e}")
 
 # =========================================================
-# ระบบเช็คซอง 
+# ระบบเช็คซอง
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -112,7 +107,7 @@ def redeem_truemoney(url, phone_number):
                 "status": "success", 
                 "amount": int(amt), 
                 "sender_masked": masked_name,
-                "full_name": full_name, # ส่งชื่อเต็มไปบันทึก
+                "full_name": full_name,
                 "hash": voucher_hash
             }
         else:
@@ -127,30 +122,31 @@ def redeem_truemoney(url, phone_number):
 
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
-✨ **ยินดีต้อนรับสู่...** ✨
-🔥 **VVIP 18+ คุยได้ (เจริญPORN)** 🔥
+✨ ยินดีต้อนรับสู่... ✨
+🔥 VVIP (เซียนจู เจริญPORN) 🔥
 ━━━━━━━━━━━━━━━━━━
-💎 **RATE PRICE (แพ็กเกจ)** 💎
+💎 RATE PRICE (แพ็กเกจ) 💎
 
-👑 **999 บาท (SSSVIP) 🔥🔥🔥**
+👑 999 บาท (ALL VVIP) 🔥🔥🔥
 └ คุ้มที่สุด! จ่ายครั้งเดียวจบ เข้าได้ทุกกลุ่มยันชาติหน้า
 
-🥈 **400 บาท (SVIP)**
+🥈 400 บาท (VVIP SAVE)
 └ สายเก็บ เซฟได้ไม่อั้น (กลุ่ม Save)
 
-🥉 **200 บาท (VIP)**
+🥉 200 บาท (VVIP)
 └ กลุ่มธรรมดา (ดูได้อย่างเดียว เซฟไม่ได้)
 ━━━━━━━━━━━━━━━━━━
-🤖 **ระบบจ่ายเงินอัตโนมัติ (Auto Bot)** 🤖
+🧧 ระบบจ่ายเงินอัตโนมัติ (Auto) 🧧
 รวดเร็ว ไม่ต้องรอแอดมินตอบ!
-📝 **วิธีใช้งานบอทชำระเงิน**
-`1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"`
-`2. อ่านวิธีทำซอง และสร้างลิงก์`
-`3. ส่งลิงก์ซองเข้ามาในแชทนี้`
 
-❓ **ติดปัญหา / มีคำถาม?**
+📝 วิธีใช้งานบอทชำระเงิน
+1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"
+2. อ่านวิธีทำซอง และสร้างลิงก์
+3. ส่งลิงก์ซองเข้ามาในแชทนี้
+
+❓ ติดปัญหา / มีคำถาม?
 หากโอนเงินแล้วไม่ได้รับลิ้งค์ หรือต้องการสอบถามเพิ่มเติม
-👉 **กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง เพื่อติดต่อแอดมินโดยตรงครับ** 👇
+👉 กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง เพื่อติดต่อแอดมินโดยตรงครับ 👇
 """
     keyboard = [
         [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
@@ -208,49 +204,53 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
     
+    # 1. รวบรวมข้อมูลลูกค้า (เก็บให้ครบที่สุด)
+    user_id = str(user.id)
+    first_name = user.first_name or ""
+    last_name = user.last_name or ""
+    username = f"@{user.username}" if user.username else "ไม่ระบุ"
+    language = user.language_code or "ไม่ระบุ"
+    is_premium = "Yes" if user.is_premium else "No"
+    
+    # 2. เช็คซอง
     res = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
     
+    # เตรียมเวลา
+    tz = pytz.timezone('Asia/Bangkok')
+    now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+
+    # ปุ่มติดต่อลูกค้า (ใช้ในห้องแอดมิน)
+    contact_btn = InlineKeyboardMarkup([[InlineKeyboardButton(f"💬 ติดต่อ: {first_name}", url=f"tg://user?id={user_id}")]])
+
+    # 3. กรณีสำเร็จ ✅
     if res['status'] == 'success':
         amt = res['amount']
         sender_masked = res['sender_masked']
         full_name = res.get('full_name', 'ไม่ระบุ')
         v_hash = res.get('hash', 'N/A')
         
-        # --- เตรียมข้อมูลเวลา ---
-        tz = pytz.timezone('Asia/Bangkok')
-        now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
-
-        # --- 📝 บันทึกลง Google Sheet (ทำงานเบื้องหลัง) ---
+        # --- บันทึก Google Sheet (Success) ---
         sheet_data = [
-            now_str,                # A: เวลา
-            amt,                    # B: ยอดเงิน
-            user.first_name,        # C: ชื่อลูกค้าใน Telegram
-            str(user.id),           # D: ID ลูกค้า
-            full_name,              # E: ชื่อ TrueMoney (ชื่อเต็ม)
-            v_hash                  # F: Hash
+            now_str, user_id, first_name, last_name, username, link, 
+            "สำเร็จ", amt, full_name, v_hash, language, is_premium
         ]
-        # เรียกฟังก์ชันบันทึก
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
         
-        # --- ส่งรายงานแอดมิน ---
+        # --- รายงานแอดมิน (Success) ---
         admin_report = f"""
-🎁 **รายงานรับซอง (Auto)**
-🕒 เวลา: {now_str}
+🎁 **รายการสำเร็จ (Auto)**
+🕒 {now_str}
 
-💰 **ข้อมูลการเงิน**
-💵 ยอดเงิน: {amt} บาท
-👤 ชื่อทรูมันนี่: {sender_masked}
+💰 **ยอดเงิน: {amt} บาท**
+👤 ทรูมันนี่: {sender_masked}
 🎫 Hash: `{v_hash}`
 
-👤 **ข้อมูลลูกค้า**
-📛 ชื่อ: {user.first_name}
-🆔 User: @{user.username if user.username else 'ไม่ระบุ'}
-🔢 ID: `{user.id}`
-⭐ สถานะ: User ทั่วไป
-
-สถานะ: ✅ **บอทอนุมัติแล้ว ({amt})**
+👤 **ลูกค้า**
+ชื่อ: {first_name} {last_name}
+User: {username}
+ID: `{user_id}`
 """
-        try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, parse_mode='Markdown')
+        try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=contact_btn, parse_mode='Markdown')
         except: pass
         
         # --- ส่งของให้ลูกค้า ---
@@ -268,8 +268,37 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**\nเลือกห้อง:", reply_markup=InlineKeyboardMarkup(kb))
         else:
             await msg.edit_text(f"✅ รับยอด {amt} บาท (ยอดไม่ตรงแพ็กเกจ) โปรดติดต่อแอดมิน")
+    
+    # 4. กรณีล้มเหลว/ซองเสีย ❌ (เพิ่มส่วนนี้ให้แล้ว)
     else:
-        await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {res['message']}")
+        error_msg = res['message']
+        
+        # --- บันทึก Google Sheet (Fail) ---
+        sheet_data = [
+            now_str, user_id, first_name, last_name, username, link, 
+            "ไม่สำเร็จ", 0, "-", error_msg, language, is_premium
+        ]
+        await asyncio.to_thread(save_to_google_sheet, sheet_data)
+
+        # --- รายงานแอดมิน (Fail/Fraud) ---
+        admin_warning = f"""
+⚠️ **แจ้งเตือน: ซองใช้ไม่ได้/ซองเสีย**
+🕒 {now_str}
+
+🚫 **สาเหตุ:** {error_msg}
+🔗 **ลิ้งก์ที่ส่ง:** `{link}`
+
+👤 **คนส่ง (ลูกค้า)**
+ชื่อ: {first_name} {last_name}
+User: {username}
+ID: `{user_id}`
+"""
+        # ส่งฟ้องแอดมินพร้อมปุ่มกดไปด่า (หยอกๆ กดไปติดต่อครับ 555)
+        try: await context.bot.send_message(ADMIN_GROUP_ID, admin_warning, reply_markup=contact_btn, parse_mode='Markdown')
+        except: pass
+
+        # แจ้งลูกค้า
+        await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {error_msg}")
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
