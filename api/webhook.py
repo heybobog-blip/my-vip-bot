@@ -23,15 +23,17 @@ SHEET_NAME = "VVIP_Data"
 # =================ตั้งค่าห้อง=================
 SELECTABLE_ROOMS = {
     "200": [
-        {"id": -1003465527678, "name": "VVIP V1 (200)"},
+        {"id": -1003465527678, "name": "VVIP V1"},
+        # {"id": IDห้องใหม่จากบอท @userinfobot , "name": "VVIP V2"},
     ],
     "400": [
-        {"id": -1003477489997, "name": "VVIP V1 SAVE (400)"}
+        {"id": -1003477489997, "name": "VVIP V1 SAVE"}
     ]
 }
 
 ALL_ACCESS_ROOMS = [
     {"id": -1003477489997, "name": "VVIP V1 SAVE"},
+    # {"id": IDห้องใหม่จากบอท @userinfobot , "name": "VVIP V2"},
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
