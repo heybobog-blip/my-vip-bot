@@ -27,7 +27,7 @@ SELECTABLE_ROOMS = {
         # {"id": IDห้องใหม่จากบอท @userinfobot, "name": "VVIP V2"},
     ],
     "400": [
-        {"id": -1003477489997, "name": "VVIP V1 SAVE (400)"}
+        {"id": -1003477489997, "name": "VVIP V1 SAVE"}
     ]
 }
 
