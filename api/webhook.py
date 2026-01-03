@@ -27,7 +27,7 @@ SELECTABLE_ROOMS = {
         # {"id": IDห้องใหม่จากบอท @userinfobot, "name": "VVIP V2"},
     ],
     "400": [
-        {"id": -1003477489997, "name": "VVIP V1 SAVE"}
+        {"id": -1003477489997, "name": "VVIP V1 SAVE (400)"}
     ]
 }
 
@@ -39,14 +39,12 @@ ALL_ACCESS_ROOMS = [
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
-# ฟังก์ชันบันทึกลง Google Sheet (เก็บครบทุกเม็ด)
+# ฟังก์ชันบันทึกลง Google Sheet
 # =========================================================
 def save_to_google_sheet(data_row):
     try:
         creds_json = os.environ.get("GOOGLE_CREDENTIALS")
-        if not creds_json:
-            print("❌ ไม่พบ GOOGLE_CREDENTIALS")
-            return
+        if not creds_json: return
 
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
                  "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
@@ -57,10 +55,9 @@ def save_to_google_sheet(data_row):
         
         sheet = client.open(SHEET_NAME).sheet1
         sheet.append_row(data_row)
-        print("✅ บันทึก Sheet สำเร็จ")
         
     except Exception as e:
-        print(f"❌ บันทึก Sheet ไม่สำเร็จ: {e}")
+        print(f"Sheet Error: {e}")
 
 # =========================================================
 # ระบบเช็คซอง
@@ -187,6 +184,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "back_main":
         await send_main_menu(update, context, is_edit=True)
 
+    # ลูกค้าเลือกห้องเอง (กรณีเงินตรงยอด)
     elif data.startswith("sel_"):
         try:
             _, gid, price = data.split('_')
@@ -196,15 +194,40 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=link.invite_link)]]
             await query.edit_message_text(f"✅ **เลือกห้องเรียบร้อย**\nกดปุ่มด้านล่างเพื่อเข้าห้อง:\n(ลิ้งก์ใช้ได้ครั้งเดียว)", reply_markup=InlineKeyboardMarkup(kb))
             await context.bot.send_message(user_id, THANK_YOU_TEXT)
-        except Exception as e:
+        except:
             await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ")
+
+    # แอดมินกดอนุมัติ (กรณีเงินไม่ตรงยอด)
+    elif data.startswith("apv_"):
+        try:
+            _, target_uid, room_price = data.split('_')
+            target_uid = int(target_uid)
+            rnd = random.randint(1000,9999)
+
+            # สร้างลิ้งก์ให้ลูกค้า
+            kb_client = []
+            if room_price == "999":
+                for g in ALL_ACCESS_ROOMS:
+                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"AdminApv999_{target_uid}_{rnd}")
+                    kb_client.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
+                await context.bot.send_message(target_uid, "✅ **แอดมินอนุมัติพิเศษให้แล้วครับ**\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client))
+            
+            elif room_price in SELECTABLE_ROOMS:
+                for r in SELECTABLE_ROOMS[room_price]:
+                    kb_client.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{room_price}")])
+                await context.bot.send_message(target_uid, f"✅ **แอดมินอนุมัติพิเศษให้แล้วครับ**\nเลือกห้องที่ต้องการ:", reply_markup=InlineKeyboardMarkup(kb_client))
+
+            # แก้ข้อความในห้องแอดมิน
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ **อนุมัติเข้าห้อง {room_price} เรียบร้อย**")
+
+        except Exception as e:
+            await query.message.reply_text(f"❌ เกิดข้อผิดพลาด: {str(e)}")
 
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
     
-    # 1. รวบรวมข้อมูลลูกค้า (เก็บให้ครบที่สุด)
     user_id = str(user.id)
     first_name = user.first_name or ""
     last_name = user.last_name or ""
@@ -212,32 +235,25 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     language = user.language_code or "ไม่ระบุ"
     is_premium = "Yes" if user.is_premium else "No"
     
-    # 2. เช็คซอง
     res = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
     
-    # เตรียมเวลา
     tz = pytz.timezone('Asia/Bangkok')
     now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
 
-    # ปุ่มติดต่อลูกค้า (ใช้ในห้องแอดมิน)
     contact_btn = InlineKeyboardMarkup([[InlineKeyboardButton(f"💬 ติดต่อ: {first_name}", url=f"tg://user?id={user_id}")]])
 
-    # 3. กรณีสำเร็จ ✅
     if res['status'] == 'success':
         amt = res['amount']
         sender_masked = res['sender_masked']
         full_name = res.get('full_name', 'ไม่ระบุ')
         v_hash = res.get('hash', 'N/A')
         
-        # --- บันทึก Google Sheet (Success) ---
-        sheet_data = [
-            now_str, user_id, first_name, last_name, username, link, 
-            "สำเร็จ", amt, full_name, v_hash, language, is_premium
-        ]
+        sheet_data = [now_str, user_id, first_name, last_name, username, link, "สำเร็จ", amt, full_name, v_hash, language, is_premium]
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
         
-        # --- รายงานแอดมิน (Success) ---
-        admin_report = f"""
+        # กรณีเงินตรงยอด (Auto)
+        if str(amt) in SELECTABLE_ROOMS or amt >= 999:
+            admin_report = f"""
 🎁 **รายการสำเร็จ (Auto)**
 🕒 {now_str}
 
@@ -250,54 +266,68 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
 User: {username}
 ID: `{user_id}`
 """
-        try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=contact_btn, parse_mode='Markdown')
-        except: pass
+            try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=contact_btn, parse_mode='Markdown')
+            except: pass
+            
+            rnd = random.randint(1000,9999)
+            if amt >= 999:
+                kb = []
+                for g in ALL_ACCESS_ROOMS:
+                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}")
+                    kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
+                await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**", reply_markup=InlineKeyboardMarkup(kb))
+            elif str(amt) in SELECTABLE_ROOMS:
+                kb = []
+                for r in SELECTABLE_ROOMS[str(amt)]:
+                    kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{amt}")])
+                await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**\nเลือกห้อง:", reply_markup=InlineKeyboardMarkup(kb))
         
-        # --- ส่งของให้ลูกค้า ---
-        rnd = random.randint(1000,9999)
-        if amt >= 999:
-            kb = []
-            for g in ALL_ACCESS_ROOMS:
-                l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}")
-                kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-            await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**", reply_markup=InlineKeyboardMarkup(kb))
-        elif str(amt) in SELECTABLE_ROOMS:
-            kb = []
-            for r in SELECTABLE_ROOMS[str(amt)]:
-                kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{amt}")])
-            await msg.edit_text(f"✅ **รับยอด {amt} เรียบร้อย**\nเลือกห้อง:", reply_markup=InlineKeyboardMarkup(kb))
+        # กรณีเงินไม่ตรงยอด (Manual Approve) --> เพิ่มส่วนนี้ให้ครับ
         else:
-            await msg.edit_text(f"✅ รับยอด {amt} บาท (ยอดไม่ตรงแพ็กเกจ) โปรดติดต่อแอดมิน")
-    
-    # 4. กรณีล้มเหลว/ซองเสีย ❌ (เพิ่มส่วนนี้ให้แล้ว)
-    else:
-        error_msg = res['message']
-        
-        # --- บันทึก Google Sheet (Fail) ---
-        sheet_data = [
-            now_str, user_id, first_name, last_name, username, link, 
-            "ไม่สำเร็จ", 0, "-", error_msg, language, is_premium
-        ]
-        await asyncio.to_thread(save_to_google_sheet, sheet_data)
-
-        # --- รายงานแอดมิน (Fail/Fraud) ---
-        admin_warning = f"""
-⚠️ **แจ้งเตือน: ซองใช้ไม่ได้/ซองเสีย**
+            admin_report = f"""
+⚠️ **ยอดเงินไม่ตรงแพ็กเกจ**
 🕒 {now_str}
 
-🚫 **สาเหตุ:** {error_msg}
-🔗 **ลิ้งก์ที่ส่ง:** `{link}`
+💰 **ยอดที่ได้รับ: {amt} บาท**
+(รับเงินเข้ากระเป๋าแล้ว แต่ยอดไม่ตรง 200/400/999)
+👤 ทรูมันนี่: {sender_masked}
+🎫 Hash: `{v_hash}`
 
-👤 **คนส่ง (ลูกค้า)**
+👤 **ลูกค้า**
 ชื่อ: {first_name} {last_name}
 User: {username}
 ID: `{user_id}`
+
+👇 **กดปุ่มด้านล่างเพื่ออนุมัติห้อง:**
 """
-        # ส่งฟ้องแอดมินพร้อมปุ่มกดไปด่า (หยอกๆ กดไปติดต่อครับ 555)
+            # สร้างปุ่มให้แอดมินเลือก
+            admin_kb = [
+                [InlineKeyboardButton("✅ ให้เข้าห้อง 200", callback_data=f"apv_{user_id}_200")],
+                [InlineKeyboardButton("✅ ให้เข้าห้อง 400", callback_data=f"apv_{user_id}_400")],
+                [InlineKeyboardButton("✅ ให้เข้าห้อง 999", callback_data=f"apv_{user_id}_999")],
+                [InlineKeyboardButton(f"💬 ติดต่อลูกค้า", url=f"tg://user?id={user_id}")]
+            ]
+            try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=InlineKeyboardMarkup(admin_kb), parse_mode='Markdown')
+            except: pass
+
+            await msg.edit_text(f"✅ **ได้รับยอด {amt} บาทแล้วครับ**\n⚠️ แต่ยอดเงินไม่ตรงกับแพ็กเกจ (200/400/999)\n\n⏳ **กรุณารอสักครู่ แอดมินกำลังตรวจสอบและส่งห้องให้ครับ...**")
+
+    else:
+        error_msg = res['message']
+        sheet_data = [now_str, user_id, first_name, last_name, username, link, "ไม่สำเร็จ", 0, "-", error_msg, language, is_premium]
+        await asyncio.to_thread(save_to_google_sheet, sheet_data)
+
+        admin_warning = f"""
+⚠️ **แจ้งเตือน: ซองใช้ไม่ได้/ซองเสีย**
+🕒 {now_str}
+🚫 **สาเหตุ:** {error_msg}
+🔗 `{link}`
+👤 {first_name} {last_name}
+ID: `{user_id}`
+"""
         try: await context.bot.send_message(ADMIN_GROUP_ID, admin_warning, reply_markup=contact_btn, parse_mode='Markdown')
         except: pass
 
-        # แจ้งลูกค้า
         await msg.edit_text(f"❌ **ทำรายการไม่ได้**\nเหตุผล: {error_msg}")
 
 class handler(BaseHTTPRequestHandler):
