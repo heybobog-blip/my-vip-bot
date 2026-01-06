@@ -41,13 +41,13 @@ SELECTABLE_ROOMS = {
 # 3. ตั้งค่ากลุ่มเหมา (999 และ 1299)
 # ราคา 999 (ได้หมด ยกเว้น OnlyFan)
 TIER_999_LIST = [
-    {"id": ID_V1, "name": "VVIP V1"},
+    # {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"}
 ]
 
 # ราคา 1299 (ได้ครบทุกอย่างรวม OnlyFan)
 TIER_1299_LIST = [
-    {"id": ID_V1, "name": "VVIP V1"},
+    # {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}
 ]
