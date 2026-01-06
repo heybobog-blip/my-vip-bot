@@ -41,18 +41,18 @@ SELECTABLE_ROOMS = {
 # 3. ตั้งค่ากลุ่มเหมา (999 และ 1299)
 # ราคา 999 (ได้หมด ยกเว้น OnlyFan)
 TIER_999_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"},
+    {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"}
 ]
 
 # ราคา 1299 (ได้ครบทุกอย่างรวม OnlyFan)
 TIER_1299_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"},
+    {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}
 ]
 
-THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในแชทแอดมินด้วยนะครับ ❤️"
+THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
 # ฟังก์ชันบันทึก Google Sheet
@@ -72,7 +72,7 @@ def save_to_google_sheet(data_row):
         print(f"Sheet Error: {e}")
 
 # =========================================================
-# ระบบเช็คซอง
+# ระบบเช็คซอง (แก้ BUG 1,299.00 แล้ว)
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -96,7 +96,11 @@ def redeem_truemoney(url, phone_number):
 
         if data.get('status', {}).get('code') == 'SUCCESS':
             d = data.get('data', {})
-            amt = float(d.get('my_ticket', {}).get('amount_baht', 0))
+            
+            # [แก้ BUG ตรงนี้] ลบลูกน้ำออกก่อนแปลงเป็นตัวเลข
+            amount_str = d.get('my_ticket', {}).get('amount_baht', '0').replace(',', '') 
+            amt = float(amount_str)
+            
             full_name = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
             voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code) 
             name_parts = full_name.split()
@@ -125,7 +129,7 @@ async def send_main_menu(update, context, is_edit=False):
 └ จ่ายทีเดียวจบ ครบทุกอารมณ์
 
 🏆 <b>999 บาท (KING TIER)</b>
-└ ได้กลุ่มทุกกลุ่มของ VVIP + กลุ่ม Save (❌ ไม่รวม OnlyFan)
+└ ได้กลุ่มหลัก + กลุ่ม Save (❌ ไม่รวม OnlyFan)
 
 🥈 <b>500 บาท (เลือก 1 กลุ่ม)</b>
 └ เลือกรับ: กลุ่ม Save <b>หรือ</b> ONLYFAN VIP
@@ -233,7 +237,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(user.id)
     first_name = user.first_name or ""
     last_name = user.last_name or ""
-    full_tg_name = f"{first_name} {last_name}".strip() # รวมชื่อนามสกุล
+    full_tg_name = f"{first_name} {last_name}".strip() 
     username = f"@{user.username}" if user.username else "ไม่ระบุ"
     language = user.language_code or "ไม่ระบุ"
     is_premium = "Yes" if user.is_premium else "No"
