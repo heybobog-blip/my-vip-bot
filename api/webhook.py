@@ -148,8 +148,8 @@ async def send_main_menu(update, context, is_edit=False):
 """
     keyboard = [
         [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
-        [InlineKeyboardButton("👤 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ซื้อกับแอดมิน 2", url="https://t.me/duded16")],
-        [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+5sWrRGBIm3Y5ODE1")]
+        [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+5sWrRGBIm3Y5ODE1")],
+        [InlineKeyboardButton("👤 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ซื้อกับแอดมิน 2", url="https://t.me/duded16")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
