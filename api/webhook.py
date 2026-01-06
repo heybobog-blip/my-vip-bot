@@ -25,7 +25,7 @@ SHEET_NAME = "VVIP_Data"
 # 1. ใส่เลข ID ห้องตรงนี้ครับ (อย่าลืมเครื่องหมายลบ -100)
 ID_V1 = -1003465527678          # ห้อง V1
 ID_SAVE = -1003477489997        # ห้อง SAVE
-ID_ONLYFAN = -1003538823768     # <--- 🔴 แก้เลขนี้เป็น ID ห้อง ONLYFAN VIP ที่หามาครับ
+ID_ONLYFAN = -1003538823768     # ห้อง ONLYFAN VIP # <--- 🔴 แก้เลขนี้เป็น ID ห้อง ONLYFAN VIP ที่หามาครับ
 
 # 2. ตั้งค่ากลุ่มสำหรับราคาที่ต้อง "เลือกอย่างใดอย่างหนึ่ง" (300, 500)
 SELECTABLE_ROOMS = {
@@ -41,18 +41,18 @@ SELECTABLE_ROOMS = {
 # 3. ตั้งค่ากลุ่มเหมา (999 และ 1299)
 # ราคา 999 (ได้หมด ยกเว้น OnlyFan)
 TIER_999_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"},
+    # {"id": ID_V1, "name": "VVIP V1"}, # ถ้าจะเอา V1 ด้วยให้เอา # ออก
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"}
 ]
 
 # ราคา 1299 (ได้ครบทุกอย่างรวม OnlyFan)
 TIER_1299_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"},
+    # {"id": ID_V1, "name": "VVIP V1"}, # ถ้าจะเอา V1 ด้วยให้เอา # ออก
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}
 ]
 
-THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในแชทแอดมินด้วยนะครับ ❤️"
+THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในกลุ่มด้วยนะครับ ❤️"
 
 # =========================================================
 # ฟังก์ชันบันทึก Google Sheet
@@ -72,7 +72,7 @@ def save_to_google_sheet(data_row):
         print(f"Sheet Error: {e}")
 
 # =========================================================
-# ระบบเช็คซอง (แก้ BUG 1,299.00 แล้ว)
+# ระบบเช็คซอง
 # =========================================================
 def redeem_truemoney(url, phone_number):
     try:
@@ -96,9 +96,8 @@ def redeem_truemoney(url, phone_number):
 
         if data.get('status', {}).get('code') == 'SUCCESS':
             d = data.get('data', {})
-            
-            # [แก้ BUG ตรงนี้] ลบลูกน้ำออกก่อนแปลงเป็นตัวเลข
-            amount_str = d.get('my_ticket', {}).get('amount_baht', '0').replace(',', '') 
+            # แก้ BUG 1,299.00
+            amount_str = d.get('my_ticket', {}).get('amount_baht', '0').replace(',', '')
             amt = float(amount_str)
             
             full_name = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
@@ -129,7 +128,7 @@ async def send_main_menu(update, context, is_edit=False):
 └ จ่ายทีเดียวจบ ครบทุกอารมณ์
 
 🏆 <b>999 บาท (KING TIER)</b>
-└ ได้กลุ่มหลัก + กลุ่ม Save (❌ ไม่รวม OnlyFan)
+└ ได้ทุกกลุ่มของ VVIP + กลุ่ม Save (❌ ไม่รวม OnlyFan)
 
 🥈 <b>500 บาท (เลือก 1 กลุ่ม)</b>
 └ เลือกรับ: กลุ่ม Save <b>หรือ</b> ONLYFAN VIP
@@ -170,6 +169,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
 
     if data == "mode_gift":
+        # ลิ้งก์รูปภาพ
+        HOW_TO_IMG = "https://img5.pic.in.th/file/secure-sv1/photo_2026-01-07_05-30-56-copy.jpg"
+        
         text = """
 📝 <b>วิธีชำระเงินด้วยซองของขวัญ (ระบบออโต้)</b>
 ➖➖➖➖➖➖➖➖➖➖
@@ -181,10 +183,21 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🚀 <b>นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะดึงเข้ากลุ่มทันที</b>
 """
         kb = [[InlineKeyboardButton("🔙 กลับเมนูหลัก", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+        
+        # [แก้ใหม่] ลบข้อความเดิมทิ้ง แล้วส่งเป็นรูปภาพแทน
+        await query.message.delete()
+        await context.bot.send_photo(
+            chat_id=user_id,
+            photo=HOW_TO_IMG,
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode='HTML'
+        )
 
     elif data == "back_main":
-        await send_main_menu(update, context, is_edit=True)
+        # [แก้ใหม่] ลบรูปภาพทิ้ง แล้วส่งเมนูหลัก (ข้อความ) ใหม่
+        await query.message.delete()
+        await send_main_menu(update, context, is_edit=False)
 
     # ลูกค้าเลือกห้องเอง (300, 500)
     elif data.startswith("sel_"):
@@ -223,7 +236,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     kb_client.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{room_price}")])
 
             await context.bot.send_message(target_uid, "✅ <b>แอดมินอนุมัติพิเศษให้แล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
-            await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>", parse_mode='HTML')
+            # [แก้จุดที่แอดมิน Error] เปลี่ยน edit_message_caption เป็น edit_message_text
+            await query.edit_message_text(text=f"{query.message.text}\n\n✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>", parse_mode='HTML')
 
         except Exception as e:
             await query.message.reply_text(f"❌ เกิดข้อผิดพลาด: {str(e)}")
@@ -233,7 +247,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
     
-    # เก็บข้อมูลลูกค้า (รวมชื่อ-นามสกุล)
+    # เก็บข้อมูลลูกค้า
     user_id = str(user.id)
     first_name = user.first_name or ""
     last_name = user.last_name or ""
@@ -254,7 +268,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_name = res.get('full_name', 'ไม่ระบุ')
         v_hash = res.get('hash', 'N/A')
         
-        # บันทึกลง Sheet (รวมชื่อแล้ว)
+        # บันทึกลง Sheet
         sheet_data = [now_str, user_id, full_tg_name, username, link, "สำเร็จ", amt, full_name, v_hash, language, is_premium]
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
         
