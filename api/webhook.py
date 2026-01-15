@@ -132,7 +132,7 @@ async def send_main_menu(update, context, is_edit=False):
 
 👑 <b>1299 บาท (GOD TIER)</b> 🔥🔥🔥
 └ <b>ได้ครบทุกกลุ่ม!</b>
-└ กลุ่มถาวร
+└ กลุ่ม VVIP (ถาวร)
 └ กลุ่มเซฟคลิปได้
 └ ONLYFAN VIP
 └ VVIP นานาชาติ
