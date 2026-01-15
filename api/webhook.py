@@ -27,6 +27,7 @@ ID_V1 = -1003465527678          # ห้อง V1
 ID_SAVE = -1003477489997        # ห้อง SAVE
 ID_ONLYFAN = -1003413682717     # ห้อง ONLYFAN VIP
 ID_MONTHLY = -1003592949127     # 🔴 (เพิ่มใหม่) ห้องรายเดือน
+ID_INTER = -1003357989161       # 🔴 (เพิ่มใหม่) ห้องนานาชาติ-1003357989161
 
 # 2. ตั้งค่ากลุ่มสำหรับราคาที่ต้อง "เลือกอย่างใดอย่างหนึ่ง" (300, 500)
 SELECTABLE_ROOMS = {
@@ -43,9 +44,10 @@ SELECTABLE_ROOMS = {
 # 3. ตั้งค่ากลุ่มเหมา (999 และ 1299)
 # ราคา 999 (ได้หมด ยกเว้น OnlyFan)
 TIER_999_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"}, 
+    # {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"} # 🔴 คนจ่าย 999 ได้เข้าห้องนี้แบบถาวร
+    # {"id": ID_INTER, "name": "VVIP นานาชาติ"}
 ]
 
 # ราคา 1299 (ได้ครบทุกอย่างรวม OnlyFan)
@@ -54,6 +56,7 @@ TIER_1299_LIST = [
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"},
     {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"} # 🔴 คนจ่าย 1299 ได้เข้าห้องนี้แบบถาวร
+    {"id": ID_INTER, "name": "VVIP นานาชาติ"}
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในแชทแอดมินด้วยนะครับ Enjoy❤️"
@@ -123,22 +126,24 @@ def redeem_truemoney(url, phone_number):
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
 ✨ ยินดีต้อนรับสู่... ✨
-🔥 <b>VVIP (เซียนจู เจริญPORN)</b> 🔥
+🔥 <b>VVIP (เซียนจู เจริญพร)</b> 🔥
 ━━━━━━━━━━━━━━━━━━
 💎 <b>RATE PRICE (แพ็กเกจ)</b> 💎
 
 👑 <b>1299 บาท (GOD TIER)</b> 🔥🔥🔥
-└ <b>ได้ครบทุกกลุ่ม!</b> (กลุ่มถาวร + กลุ่มSave + ONLYFAN VIP)
+└ <b>ได้ครบทุกกลุ่ม!</b>
+└ กลุ่มถาวร + กลุ่มเซฟคลิปได้ + ONLYFAN VIP + VVIP นานาชาติ
 └ จ่ายทีเดียวจบ ครบทุกอารมณ์
 
 🏆 <b>999 บาท (KING TIER)</b>
-└ ได้กลุ่ม VVIP (ถาวร) + Save (❌ ไม่รวม OnlyFan)
+└ ได้กลุ่ม VVIP (ถาวร) + กลุ่มSave
+└ ❌ ไม่รวม OnlyFan และ VVIP นานาชาติ
 
 🥈 <b>500 บาท (เลือก 1 กลุ่ม)</b>
-└ เลือกรับ: กลุ่ม Save <b>หรือ</b> ONLYFAN VIP
+└ เลือกรับ: กลุ่มเซฟคลิปได้ <b>หรือ</b> ONLYFAN VIP
 
 🥉 <b>300 บาท (เลือก 1 กลุ่ม)</b>
-└ เลือกรับ: VVIP V1 (ถาวรอัพคลิปถึง 22/01/69)
+└ เลือกรับ: VVIP V1 ถาวร(อัพคลิปถึง 22/01/69)
 ━━━━━━━━━━━━━━━━━━
 🧧 <b>ระบบจ่ายเงินอัตโนมัติ (Auto)</b> 🧧
 รวดเร็ว ไม่ต้องรอแอดมินตอบ!
@@ -149,12 +154,12 @@ async def send_main_menu(update, context, is_edit=False):
 3. ส่งลิงก์ซองเข้ามาในแชทนี้
 
 ❓ ติดปัญหา / มีคำถาม?
-👉 กดปุ่ม "ซื้อกับแอดมิน" ด้านล่าง 👇
+👉 กดปุ่ม "👤 ติดต่อแอดมิน" ด้านล่าง 👇
 """
     keyboard = [
         [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
         [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+5sWrRGBIm3Y5ODE1")],
-        [InlineKeyboardButton("👤 ซื้อกับแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ซื้อกับแอดมิน 2", url="https://t.me/duded16")]
+        [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
