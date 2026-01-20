@@ -197,7 +197,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {e}")
 
-    # ================= ส่วนอนุมัติ =================
+    # ================= ส่วนอนุมัติ (เพิ่มปุ่มติดต่อลูกค้าหลังกดอนุมัติ) =================
     elif data.startswith("apv_"):
         try:
             _, target_uid, room_price = data.split('_')
@@ -206,11 +206,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb_client = []
             error_logs = []
 
+            # 1. เตรียมลิสต์ห้องตามราคา
             target_list = []
             if room_price == "1299": target_list = TIER_1299_LIST
             elif room_price == "999": target_list = TIER_999_LIST
             elif room_price in SELECTABLE_ROOMS: target_list = SELECTABLE_ROOMS[room_price]
 
+            # 2. วนลูปสร้างลิ้งก์
             for g in target_list:
                 try:
                     l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv{room_price}_{target_uid}_{rnd}")
@@ -225,17 +227,35 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     error_logs.append(f"- {g['name']}: {e}")
 
             if kb_client:
+                # 3. ส่งลิ้งก์ให้ลูกค้า
                 try:
                     await context.bot.send_message(target_uid, "✅ <b>สลิป/ยอดเงิน ได้รับการอนุมัติแล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
                     
+                    # 4. อัปเดตข้อความฝั่งแอดมิน + ใส่ปุ่มติดต่อลูกค้ากลับเข้าไป
                     msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
                     if error_logs: msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
 
-                    original_text = query.message.caption if query.message.caption else query.message.text
-                    try: await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
-                    except: await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+                    # สร้างปุ่มติดต่อลูกค้า
+                    contact_user_kb = [[InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]]
 
-                    # 🔴 บันทึกลง Google Sheet
+                    original_text = query.message.caption if query.message.caption else query.message.text
+                    
+                    try: 
+                        await query.edit_message_caption(
+                            caption=f"{original_text}\n\n{msg_status}", 
+                            reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- ใส่ปุ่มตรงนี้
+                            parse_mode='HTML'
+                        )
+                    except: 
+                        await query.edit_message_text(
+                            text=f"{original_text}\n\n{msg_status}", 
+                            reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- ใส่ปุ่มตรงนี้
+                            parse_mode='HTML'
+                        )
+
+                    # ---------------------------------------------------------
+                    # 🔴 5. บันทึกลง Google Sheet
+                    # ---------------------------------------------------------
                     try:
                         user_info = await context.bot.get_chat(target_uid)
                         full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
