@@ -5,67 +5,58 @@ import re
 import requests
 import random
 from datetime import datetime
-import pytz 
-import gspread 
-from oauth2client.service_account import ServiceAccountCredentials 
+import pytz
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from http.server import BaseHTTPRequestHandler
 
 # =================ตั้งค่าข้อมูลระบบ=================
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_GROUP_ID = -1003614142313 
-MY_PHONE_NUMBER = "0659325591"  
+ADMIN_GROUP_ID = -1003614142313
+MY_PHONE_NUMBER = "0659325591"
 
 # ชื่อไฟล์ Google Sheet
-SHEET_NAME = "VVIP_Data" 
+SHEET_NAME = "VVIP_Data"
 
-# =================ตั้งค่าห้อง (ใส่เลข ID ให้ครบ)=================
+# =================ตั้งค่าห้อง=================
+ID_V1 = -1003465527678
+ID_SAVE = -1003477489997
+ID_ONLYFAN = -1003413682717
+ID_MONTHLY = -1003592949127
+ID_INTER = -1003357989161
+ID_SERIES = -1003281870942
 
-# 1. ใส่เลข ID ห้องตรงนี้ครับ
-ID_V1 = -1003465527678          # ห้อง V1
-ID_SAVE = -1003477489997        # ห้อง SAVE
-ID_ONLYFAN = -1003413682717     # ห้อง ONLYFAN VIP
-ID_MONTHLY = -1003592949127     # 🔴 (เพิ่มใหม่) ห้องรายเดือน
-ID_INTER = -1003357989161       # 🔴 (เพิ่มใหม่) ห้องนานาชาติ-1003357989161
-ID_SERIES = -1003281870942      # 🔴 (เพิ่มใหม่) ห้องหนังซีรี่ย์
-
-# 2. ตั้งค่ากลุ่มสำหรับราคาที่ต้อง "เลือกอย่างใดอย่างหนึ่ง" (300, 500)
+# ราคา 300, 500
 SELECTABLE_ROOMS = {
     "300": [
-        {"id": ID_V1, "name": "VVIP V1"}          # ทางเลือก 1
-        # {"id": ID_MONTHLY, "name": "VVIP รายเดือน (30 วัน)"} # 🔴 ทางเลือก 2 (มาใหม่)
+        {"id": ID_V1, "name": "VVIP V1"}
     ],
     "500": [
-        {"id": ID_SAVE, "name": "VVIP V1 SAVE"},     
-        {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}    
+        {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
+        {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}
     ]
 }
 
-# 3. ตั้งค่ากลุ่มเหมา (999 และ 1299)
-# ราคา 999 (ได้หมด ยกเว้น OnlyFan)
+# ราคา 999
 TIER_999_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"},
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
-    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"} # 🔴 คนจ่าย 999 ได้เข้าห้องนี้แบบถาวร
-    # {"id": ID_INTER, "name": "VVIP นานาชาติ"}
+    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}
 ]
 
-# ราคา 1299 (ได้ครบทุกอย่างรวม OnlyFan)
+# ราคา 1299 (แก้จุดผิด: เติมลูกน้ำให้แล้ว)
 TIER_1299_LIST = [
-    # {"id": ID_V1, "name": "VVIP V1"}, 
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"},
-    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}, # 🔴 คนจ่าย 1299 ได้เข้าห้องนี้แบบถาวร
+    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}, 
     {"id": ID_INTER, "name": "VVIP นานาชาติ"},
     {"id": ID_SERIES, "name": "หนังพรีเมี่ยม"}
 ]
 
 THANK_YOU_TEXT = "ขอบคุณที่ซัพพอร์ตครับ ฝากพิมพ์ +1 และ รีวิวในแชทแอดมินด้วยนะครับ Enjoy❤️"
 
-# =========================================================
-# ฟังก์ชันบันทึก Google Sheet
-# =========================================================
+# ================= ฟังก์ชันบันทึก Sheet =================
 def save_to_google_sheet(data_row):
     try:
         creds_json = os.environ.get("GOOGLE_CREDENTIALS")
@@ -80,9 +71,7 @@ def save_to_google_sheet(data_row):
     except Exception as e:
         print(f"Sheet Error: {e}")
 
-# =========================================================
-# ระบบเช็คซอง
-# =========================================================
+# ================= ฟังก์ชันเช็คซอง =================
 def redeem_truemoney(url, phone_number):
     try:
         match = re.search(r'v=([a-zA-Z0-9]+)', url)
@@ -90,41 +79,35 @@ def redeem_truemoney(url, phone_number):
         voucher_code = match.group(1)
         headers = {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json',
             'Origin': 'https://gift.truemoney.com',
             'Referer': 'https://gift.truemoney.com/'
         }
         payload = {"mobile": phone_number, "voucher_hash": voucher_code}
         response = requests.post(
-            f"https://gift.truemoney.com/campaign/vouchers/{voucher_code}/redeem", 
+            f"https://gift.truemoney.com/campaign/vouchers/{voucher_code}/redeem",
             json=payload, headers=headers, timeout=30
         )
         try: data = response.json()
-        except json.JSONDecodeError: return {"status": "error", "message": f"Server Error ({response.status_code})"}
+        except: return {"status": "error", "message": f"Server Error ({response.status_code})"}
 
         if data.get('status', {}).get('code') == 'SUCCESS':
             d = data.get('data', {})
-            # แก้ BUG 1,299.00
             amount_str = d.get('my_ticket', {}).get('amount_baht', '0').replace(',', '')
             amt = float(amount_str)
-            
             full_name = d.get('owner_profile', {}).get('nickname', 'ไม่ระบุ')
-            voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code) 
+            voucher_hash = d.get('voucher', {}).get('voucher_id', voucher_code)
             name_parts = full_name.split()
             masked_name = f"{name_parts[0]} ***" if len(name_parts) > 1 else full_name
-            
             return {
-                "status": "success", "amount": int(amt), 
+                "status": "success", "amount": int(amt),
                 "sender_masked": masked_name, "full_name": full_name, "hash": voucher_hash
             }
         else: return {"status": "error", "message": data.get('status', {}).get('code', 'Unknown Error')}
     except Exception as e: return {"status": "error", "message": str(e)}
 
-# =========================================================
-# ส่วนแสดงผล (Frontend)
-# =========================================================
-
+# ================= ส่วน Frontend =================
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
 ✨ ยินดีต้อนรับสู่... ✨
@@ -168,7 +151,6 @@ async def send_main_menu(update, context, is_edit=False):
         [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     if is_edit:
         await update.callback_query.edit_message_text(text=TEXT, reply_markup=reply_markup, parse_mode='HTML')
     else:
@@ -184,9 +166,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
 
     if data == "mode_gift":
-        # ลิ้งก์รูปภาพ
         HOW_TO_IMG = "https://img5.pic.in.th/file/secure-sv1/photo_2026-01-07_05-30-56-copy.jpg"
-        
         text = """
 📝 <b>วิธีชำระเงินด้วยซองของขวัญ (ระบบออโต้)</b>
 ➖➖➖➖➖➖➖➖➖➖
@@ -198,21 +178,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🚀 <b>นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะดึงเข้ากลุ่มทันที</b>
 """
         kb = [[InlineKeyboardButton("🔙 กลับเมนูหลัก", callback_data="back_main")]]
-        
         await query.message.delete()
-        await context.bot.send_photo(
-            chat_id=user_id,
-            photo=HOW_TO_IMG,
-            caption=text,
-            reply_markup=InlineKeyboardMarkup(kb),
-            parse_mode='HTML'
-        )
+        await context.bot.send_photo(chat_id=user_id, photo=HOW_TO_IMG, caption=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
 
     elif data == "back_main":
         await query.message.delete()
         await send_main_menu(update, context, is_edit=False)
 
-    # ลูกค้าเลือกห้องเอง (300, 500)
     elif data.startswith("sel_"):
         try:
             _, gid, price = data.split('_')
@@ -222,54 +194,72 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("⭐️ กดเข้ากลุ่มที่นี่ ⭐️", url=link.invite_link)]]
             await query.edit_message_text(f"✅ <b>เลือกห้องเรียบร้อย</b>\nกดปุ่มด้านล่างเพื่อเข้าห้อง:\n(ลิ้งก์ใช้ได้ครั้งเดียว)", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
             await context.bot.send_message(user_id, THANK_YOU_TEXT)
-        except:
-            await query.message.reply_text("❌ สร้างลิ้งก์ไม่สำเร็จ (โปรดแจ้งแอดมิน)")
+        except Exception as e:
+            await query.message.reply_text(f"❌ Error: {e}")
 
-    # แอดมินกดอนุมัติ (Manual Approve)
+    # ================= ส่วนอนุมัติ (แก้บัค Chat not found) =================
     elif data.startswith("apv_"):
         try:
             _, target_uid, room_price = data.split('_')
             target_uid = int(target_uid)
             rnd = random.randint(1000,9999)
             kb_client = []
+            error_logs = [] # เก็บรายชื่อห้องที่มีปัญหา
 
-            # สร้างลิ้งก์ตามราคาที่อนุมัติ
+            target_list = []
             if room_price == "1299":
-                for g in TIER_1299_LIST:
-                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv1299_{target_uid}_{rnd}")
-                    kb_client.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-            
+                target_list = TIER_1299_LIST
             elif room_price == "999":
-                for g in TIER_999_LIST:
-                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv999_{target_uid}_{rnd}")
-                    kb_client.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-            
+                target_list = TIER_999_LIST
             elif room_price in SELECTABLE_ROOMS:
-                for r in SELECTABLE_ROOMS[room_price]:
-                    kb_client.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{room_price}")])
+                target_list = SELECTABLE_ROOMS[room_price]
 
-            await context.bot.send_message(target_uid, "✅ <b>แอดมินอนุมัติพิเศษให้แล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
-            await query.edit_message_text(text=f"{query.message.text}\n\n✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>", parse_mode='HTML')
+            # วนลูปสร้างลิ้งก์ทีละห้อง (ถ้าห้องไหนพัง จะข้ามไป)
+            for g in target_list:
+                try:
+                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv{room_price}_{target_uid}_{rnd}")
+                    action_text = f"เข้า {g['name']}" if room_price not in ["300", "500"] else f"เลือก {g['name']}"
+                    callback = l.invite_link if room_price not in ["300", "500"] else f"sel_{g['id']}_{room_price}"
+                    
+                    if room_price in ["300", "500"]:
+                        kb_client.append([InlineKeyboardButton(action_text, callback_data=callback)])
+                    else:
+                        kb_client.append([InlineKeyboardButton(action_text, url=callback)])
+                except Exception as e:
+                    # ถ้าสร้างลิ้งก์ไม่ได้ ให้เก็บ Log ไว้บอกแอดมิน
+                    error_logs.append(f"- {g['name']}: {e}")
+
+            if kb_client:
+                # ส่งหาลูกค้า
+                try:
+                    await context.bot.send_message(target_uid, "✅ <b>แอดมินอนุมัติพิเศษให้แล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
+                    
+                    msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
+                    if error_logs:
+                        msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
+                    
+                    await query.edit_message_text(text=f"{query.message.text}\n\n{msg_status}", parse_mode='HTML')
+                except Exception as e:
+                    await query.message.reply_text(f"❌ สร้างลิ้งก์ได้ แต่ส่งหาลูกค้าไม่สำเร็จ (ลูกค้าบล็อกบอท?): {e}")
+            else:
+                await query.message.reply_text(f"❌ ไม่สามารถสร้างลิ้งก์ได้เลยสักห้อง\nError:\n" + "\n".join(error_logs))
 
         except Exception as e:
-            await query.message.reply_text(f"❌ เกิดข้อผิดพลาด: {str(e)}")
+            await query.message.reply_text(f"❌ Critical Error: {str(e)}")
 
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
     user = update.message.from_user
     msg = await update.message.reply_text("🤖 กำลังตรวจสอบซอง...")
-    
-    # เก็บข้อมูลลูกค้า
     user_id = str(user.id)
     first_name = user.first_name or ""
     last_name = user.last_name or ""
-    full_tg_name = f"{first_name} {last_name}".strip() 
+    full_tg_name = f"{first_name} {last_name}".strip()
     username = f"@{user.username}" if user.username else "ไม่ระบุ"
     language = user.language_code or "ไม่ระบุ"
     is_premium = "Yes" if user.is_premium else "No"
-    
+
     res = await asyncio.to_thread(redeem_truemoney, link, MY_PHONE_NUMBER)
-    
     tz = pytz.timezone('Asia/Bangkok')
     now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
     contact_btn = InlineKeyboardMarkup([[InlineKeyboardButton(f"💬 ติดต่อ: {first_name}", url=f"tg://user?id={user_id}")]])
@@ -279,61 +269,48 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sender_masked = res['sender_masked']
         full_name = res.get('full_name', 'ไม่ระบุ')
         v_hash = res.get('hash', 'N/A')
-        
-        # บันทึกลง Sheet
         sheet_data = [now_str, user_id, full_tg_name, username, link, "สำเร็จ", amt, full_name, v_hash, language, is_premium]
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
-        
-        # ตรวจสอบยอดเงิน (เพิ่ม 1299)
+
         if str(amt) in SELECTABLE_ROOMS or amt >= 999:
             admin_report = f"""
 🎁 <b>รายการสำเร็จ (Auto)</b>
 🕒 {now_str}
-
 💰 <b>ยอดเงิน: {amt} บาท</b>
 👤 ทรูมันนี่: {sender_masked}
 🎫 Hash: <code>{v_hash}</code>
-
-👤 <b>ลูกค้า</b>
-ชื่อ: {full_tg_name}
-User: {username}
-ID: <code>{user_id}</code>
+👤 <b>ลูกค้า:</b> {full_tg_name} (ID: {user_id})
 """
             try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=contact_btn, parse_mode='HTML')
-            except Exception as e: print(f"❌ Send Admin Error: {e}")
-            
-            rnd = random.randint(1000,9999)
-            
-            # กรณี 1299 (ได้ครบทุกอย่าง)
-            if amt >= 1299:
-                kb = []
-                for g in TIER_1299_LIST:
-                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto1299_{user.id}_{rnd}")
-                    kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-                await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาท (GOD TIER)</b>\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+            except: pass
 
-            # กรณี 999 (ได้ V1+SAVE+Monthly)
-            elif amt >= 999:
-                kb = []
-                for g in TIER_999_LIST:
-                    l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto999_{user.id}_{rnd}")
-                    kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
-                await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาท (KING TIER)</b>\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+            rnd = random.randint(1000,9999)
+            kb = []
+            target_list = []
+            if amt >= 1299: target_list = TIER_1299_LIST
+            elif amt >= 999: target_list = TIER_999_LIST
             
-            # กรณี 300, 500 (เลือกห้อง)
+            if target_list:
+                for g in target_list:
+                    try:
+                        l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto{int(amt)}_{user.id}_{rnd}")
+                        kb.append([InlineKeyboardButton(f"เข้า {g['name']}", url=l.invite_link)])
+                    except Exception as e:
+                        print(f"Error creating link for {g['id']}: {e}")
+                
+                tier_name = "GOD TIER" if amt >= 1299 else "KING TIER"
+                await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาท ({tier_name})</b>\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+            
             elif str(amt) in SELECTABLE_ROOMS:
-                kb = []
                 for r in SELECTABLE_ROOMS[str(amt)]:
                     kb.append([InlineKeyboardButton(f"เลือก {r['name']}", callback_data=f"sel_{r['id']}_{amt}")])
                 await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาท</b>\nเลือกห้องที่ต้องการ:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
-        
-        # ยอดไม่ตรง (Manual Approve)
+
         else:
             admin_report = f"""
 ⚠️ <b>ยอดเงินไม่ตรงแพ็กเกจ</b>
 🕒 {now_str}
 💰 <b>ยอดที่ได้รับ: {amt} บาท</b>
-(รับเงินแล้ว แต่ยอดไม่ตรง 300/500/999/1299)
 👤 ทรูมันนี่: {sender_masked}
 🎫 Hash: <code>{v_hash}</code>
 👤 <b>ลูกค้า:</b> {full_tg_name}
@@ -346,15 +323,12 @@ ID: <code>{user_id}</code>
             try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=InlineKeyboardMarkup(admin_kb), parse_mode='HTML')
             except: pass
             await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาทแล้วครับ</b>\n⚠️ ยอดเงินไม่ตรงแพ็กเกจ รอแอดมินตรวจสอบสักครู่ครับ...", parse_mode='HTML')
-
-    # กรณีซองเสีย
     else:
         error_msg = res['message']
         sheet_data = [now_str, user_id, full_tg_name, username, link, "ไม่สำเร็จ", 0, "-", error_msg, language, is_premium]
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
-
         admin_warning = f"""
-⚠️ <b>แจ้งเตือน: ซองใช้ไม่ได้/ซองเสีย</b>
+⚠️ <b>แจ้งเตือน: ซองเสีย/ใช้ไม่ได้</b>
 🕒 {now_str}
 🚫 <b>สาเหตุ:</b> {error_msg}
 🔗 <code>{link}</code>
@@ -378,9 +352,12 @@ class handler(BaseHTTPRequestHandler):
             app.add_handler(CallbackQueryHandler(button_click))
             async with app: await app.process_update(Update.de_json(update_data, app.bot))
 
-        try: asyncio.run(main())
-        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop); loop.run_until_complete(main())
-        except Exception as e: print(e)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running(): loop.create_task(main())
+            else: loop.run_until_complete(main())
+        except RuntimeError: asyncio.run(main())
+        except: pass
 
         self.send_response(200); self.end_headers(); self.wfile.write(b'OK')
     def do_GET(self):
