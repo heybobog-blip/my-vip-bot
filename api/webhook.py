@@ -261,18 +261,33 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {str(e)}")
 
-    # ปุ่มปฏิเสธสลิป
+    # ปุ่มปฏิเสธสลิป (แก้ไข: เพิ่มปุ่มติดต่อแอดมินให้ลูกค้า)
     elif data.startswith("reject_"):
         _, target_uid = data.split('_')
         try:
-            await context.bot.send_message(target_uid, "❌ <b>สลิปไม่ผ่านการตรวจสอบ</b>\nโปรดติดต่อแอดมินเพื่อสอบถามข้อมูลเพิ่มเติม", parse_mode='HTML')
-            
-            original_text = query.message.caption if query.message.caption else query.message.text
-            try: await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
-            except: await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
-        except:
-            await query.message.reply_text("❌ ส่งแจ้งเตือนลูกค้าไม่ได้")
+            # 1. สร้างปุ่มติดต่อแอดมิน
+            contact_kb = [
+                [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001")],
+                [InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
+            ]
 
+            # 2. ส่งข้อความแจ้งเตือนลูกค้าพร้อมปุ่ม
+            await context.bot.send_message(
+                chat_id=target_uid, 
+                text="❌ <b>สลิปไม่ผ่านการตรวจสอบ</b>\nโปรดติดต่อแอดมินเพื่อสอบถามข้อมูลเพิ่มเติม", 
+                reply_markup=InlineKeyboardMarkup(contact_kb), # <--- ใส่ปุ่มตรงนี้
+                parse_mode='HTML'
+            )
+            
+            # 3. อัปเดตข้อความฝั่งแอดมินว่า "ปฏิเสธแล้ว"
+            original_text = query.message.caption if query.message.caption else query.message.text
+            try: 
+                await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+            except: 
+                await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+                
+        except Exception as e:
+            await query.message.reply_text(f"❌ ส่งแจ้งเตือนลูกค้าไม่ได้: {e}")
 # ================= ฟังก์ชันรับรูปสลิป (แก้บัคแล้ว: เช็ค Private Chat) =================
 async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🔴 จุดแก้บัค: ถ้าไม่ใช่แชทส่วนตัว (เช่น ส่งในกลุ่มแอดมิน) ให้ข้ามเลย
