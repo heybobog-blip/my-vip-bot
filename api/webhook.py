@@ -45,11 +45,11 @@ TIER_999_LIST = [
     {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}
 ]
 
-# ราคา 1299 (แก้จุดผิด: เติมลูกน้ำให้แล้ว)
+# ราคา 1299
 TIER_1299_LIST = [
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"},
-    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}, 
+    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"},
     {"id": ID_INTER, "name": "VVIP นานาชาติ"},
     {"id": ID_SERIES, "name": "หนังพรีเมี่ยม"}
 ]
@@ -197,14 +197,14 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {e}")
 
-    # ================= ส่วนอนุมัติ (แก้บัค Chat not found) =================
+    # ================= ส่วนอนุมัติ (ใช้ร่วมกันทั้ง ทรูมันนี่ และ สลิป) =================
     elif data.startswith("apv_"):
         try:
             _, target_uid, room_price = data.split('_')
             target_uid = int(target_uid)
             rnd = random.randint(1000,9999)
             kb_client = []
-            error_logs = [] # เก็บรายชื่อห้องที่มีปัญหา
+            error_logs = []
 
             target_list = []
             if room_price == "1299":
@@ -214,7 +214,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif room_price in SELECTABLE_ROOMS:
                 target_list = SELECTABLE_ROOMS[room_price]
 
-            # วนลูปสร้างลิ้งก์ทีละห้อง (ถ้าห้องไหนพัง จะข้ามไป)
             for g in target_list:
                 try:
                     l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv{room_price}_{target_uid}_{rnd}")
@@ -226,26 +225,84 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     else:
                         kb_client.append([InlineKeyboardButton(action_text, url=callback)])
                 except Exception as e:
-                    # ถ้าสร้างลิ้งก์ไม่ได้ ให้เก็บ Log ไว้บอกแอดมิน
                     error_logs.append(f"- {g['name']}: {e}")
 
             if kb_client:
-                # ส่งหาลูกค้า
+                # ส่งลิ้งก์ให้ลูกค้า
                 try:
-                    await context.bot.send_message(target_uid, "✅ <b>แอดมินอนุมัติพิเศษให้แล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
+                    await context.bot.send_message(target_uid, "✅ <b>สลิป/ยอดเงิน ได้รับการอนุมัติแล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
                     
+                    # อัปเดตข้อความฝั่งแอดมิน (รองรับทั้ง Text และ Caption รูปภาพ)
                     msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
-                    if error_logs:
-                        msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
+                    if error_logs: msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
+
+                    # ถ้าเป็นรูปภาพ (สลิป) ต้องแก้ Caption ถ้าเป็นข้อความ แก้ Text
+                    original_text = query.message.caption if query.message.caption else query.message.text
                     
-                    await query.edit_message_text(text=f"{query.message.text}\n\n{msg_status}", parse_mode='HTML')
+                    try:
+                        await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+                    except:
+                        await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+
                 except Exception as e:
-                    await query.message.reply_text(f"❌ สร้างลิ้งก์ได้ แต่ส่งหาลูกค้าไม่สำเร็จ (ลูกค้าบล็อกบอท?): {e}")
+                    await query.message.reply_text(f"❌ ส่งหาลูกค้าไม่สำเร็จ (เขาบล็อกบอท?): {e}")
             else:
-                await query.message.reply_text(f"❌ ไม่สามารถสร้างลิ้งก์ได้เลยสักห้อง\nError:\n" + "\n".join(error_logs))
+                await query.message.reply_text(f"❌ สร้างลิ้งก์ไม่ได้เลย: {error_logs}")
 
         except Exception as e:
-            await query.message.reply_text(f"❌ Critical Error: {str(e)}")
+            await query.message.reply_text(f"❌ Error: {str(e)}")
+            
+    # ปุ่มปฏิเสธสลิป
+    elif data.startswith("reject_"):
+        _, target_uid = data.split('_')
+        try:
+            await context.bot.send_message(target_uid, "❌ <b>สลิปไม่ผ่านการตรวจสอบ</b>\nโปรดติดต่อแอดมินเพื่อสอบถามข้อมูลเพิ่มเติม", parse_mode='HTML')
+            
+            original_text = query.message.caption if query.message.caption else query.message.text
+            try:
+                await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+            except:
+                await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+        except:
+            await query.message.reply_text("❌ ส่งแจ้งเตือนลูกค้าไม่ได้")
+
+# ================= ฟังก์ชันรับรูปสลิป (Hidden Feature) =================
+async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ดึงข้อมูลรูปภาพที่ชัดที่สุด
+    photo_file = update.message.photo[-1].file_id
+    user = update.message.from_user
+    user_id = user.id
+    name = user.first_name
+    username = f"@{user.username}" if user.username else "ไม่ระบุ"
+
+    # ข้อความส่งเข้าห้องแอดมิน
+    admin_caption = f"""
+🧾 <b>ได้รับสลิปใหม่!</b>
+👤 <b>ลูกค้า:</b> {name} ({username})
+🆔 <code>{user_id}</code>
+
+👇 <b>กดปุ่มด้านล่างเพื่ออนุมัติและส่งลิ้งก์:</b>
+"""
+    # ปุ่มกดอนุมัติ (ใช้ระบบเดียวกับ Truemoney Manual Approve)
+    kb = [
+        [InlineKeyboardButton("✅ อนุมัติ 300", callback_data=f"apv_{user_id}_300"), InlineKeyboardButton("✅ อนุมัติ 500", callback_data=f"apv_{user_id}_500")],
+        [InlineKeyboardButton("✅ อนุมัติ 999", callback_data=f"apv_{user_id}_999"), InlineKeyboardButton("✅ อนุมัติ 1299", callback_data=f"apv_{user_id}_1299")],
+        [InlineKeyboardButton("❌ ปฏิเสธสลิป", callback_data=f"reject_{user_id}")]
+    ]
+
+    try:
+        # ส่งเข้ากลุ่มแอดมิน
+        await context.bot.send_photo(
+            chat_id=ADMIN_GROUP_ID,
+            photo=photo_file,
+            caption=admin_caption,
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode='HTML'
+        )
+        # ตอบกลับลูกค้า
+        await update.message.reply_text("📨 <b>ได้รับสลิปแล้วครับ</b>\nรอแอดมินตรวจสอบสักครู่ ระบบจะส่งลิ้งก์ให้ทันทีเมื่ออนุมัติครับ", parse_mode='HTML')
+    except Exception as e:
+        await update.message.reply_text(f"❌ เกิดข้อผิดพลาดในการส่งสลิป: {e}")
 
 async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = update.message.text.strip()
@@ -349,6 +406,8 @@ class handler(BaseHTTPRequestHandler):
             app = ApplicationBuilder().token(TOKEN).build()
             app.add_handler(CommandHandler('start', start))
             app.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_gift))
+            # 👇 เพิ่ม Handler รับรูปภาพ (สลิป) ตรงนี้
+            app.add_handler(MessageHandler(filters.PHOTO, handle_slip_image)) 
             app.add_handler(CallbackQueryHandler(button_click))
             async with app: await app.process_update(Update.de_json(update_data, app.bot))
 
