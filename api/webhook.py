@@ -207,12 +207,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             error_logs = []
 
             target_list = []
-            if room_price == "1299":
-                target_list = TIER_1299_LIST
-            elif room_price == "999":
-                target_list = TIER_999_LIST
-            elif room_price in SELECTABLE_ROOMS:
-                target_list = SELECTABLE_ROOMS[room_price]
+            if room_price == "1299": target_list = TIER_1299_LIST
+            elif room_price == "999": target_list = TIER_999_LIST
+            elif room_price in SELECTABLE_ROOMS: target_list = SELECTABLE_ROOMS[room_price]
 
             for g in target_list:
                 try:
@@ -232,17 +229,29 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     await context.bot.send_message(target_uid, "✅ <b>สลิป/ยอดเงิน ได้รับการอนุมัติแล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
                     
-                    # อัปเดตข้อความฝั่งแอดมิน (รองรับทั้ง Text และ Caption รูปภาพ)
+                    # อัปเดตข้อความฝั่งแอดมิน
                     msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
                     if error_logs: msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
 
-                    # ถ้าเป็นรูปภาพ (สลิป) ต้องแก้ Caption ถ้าเป็นข้อความ แก้ Text
                     original_text = query.message.caption if query.message.caption else query.message.text
-                    
+                    try: await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+                    except: await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+
+                    # 🔴 บันทึกลง Google Sheet
                     try:
-                        await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
-                    except:
-                        await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", parse_mode='HTML')
+                        user_info = await context.bot.get_chat(target_uid)
+                        full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
+                        username = f"@{user_info.username}" if user_info.username else "ไม่ระบุ"
+                        tz = pytz.timezone('Asia/Bangkok')
+                        now_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+
+                        sheet_data = [
+                            now_str, str(target_uid), full_name, username, "สลิปโอนเงิน (Manual)", "สำเร็จ",
+                            int(room_price), "Admin Approved", "Slip Verification", "-", "-"
+                        ]
+                        await asyncio.to_thread(save_to_google_sheet, sheet_data)
+                    except Exception as e:
+                        print(f"❌ Save Sheet Error: {e}")
 
                 except Exception as e:
                     await query.message.reply_text(f"❌ ส่งหาลูกค้าไม่สำเร็จ (เขาบล็อกบอท?): {e}")
@@ -251,7 +260,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {str(e)}")
-            
+
     # ปุ่มปฏิเสธสลิป
     elif data.startswith("reject_"):
         _, target_uid = data.split('_')
@@ -259,23 +268,25 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(target_uid, "❌ <b>สลิปไม่ผ่านการตรวจสอบ</b>\nโปรดติดต่อแอดมินเพื่อสอบถามข้อมูลเพิ่มเติม", parse_mode='HTML')
             
             original_text = query.message.caption if query.message.caption else query.message.text
-            try:
-                await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
-            except:
-                await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+            try: await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
+            except: await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", parse_mode='HTML')
         except:
             await query.message.reply_text("❌ ส่งแจ้งเตือนลูกค้าไม่ได้")
 
-# ================= ฟังก์ชันรับรูปสลิป (Hidden Feature) =================
+# ================= ฟังก์ชันรับรูปสลิป (แก้บัคแล้ว: เช็ค Private Chat) =================
 async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ดึงข้อมูลรูปภาพที่ชัดที่สุด
+    # 🔴 จุดแก้บัค: ถ้าไม่ใช่แชทส่วนตัว (เช่น ส่งในกลุ่มแอดมิน) ให้ข้ามเลย
+    if update.message.chat.type != 'private':
+        return
+
+    if not update.message.photo: return
+    
     photo_file = update.message.photo[-1].file_id
     user = update.message.from_user
     user_id = user.id
     name = user.first_name
     username = f"@{user.username}" if user.username else "ไม่ระบุ"
 
-    # ข้อความส่งเข้าห้องแอดมิน
     admin_caption = f"""
 🧾 <b>ได้รับสลิปใหม่!</b>
 👤 <b>ลูกค้า:</b> {name} ({username})
@@ -283,7 +294,6 @@ async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 👇 <b>กดปุ่มด้านล่างเพื่ออนุมัติและส่งลิ้งก์:</b>
 """
-    # ปุ่มกดอนุมัติ (ใช้ระบบเดียวกับ Truemoney Manual Approve)
     kb = [
         [InlineKeyboardButton("✅ อนุมัติ 300", callback_data=f"apv_{user_id}_300"), InlineKeyboardButton("✅ อนุมัติ 500", callback_data=f"apv_{user_id}_500")],
         [InlineKeyboardButton("✅ อนุมัติ 999", callback_data=f"apv_{user_id}_999"), InlineKeyboardButton("✅ อนุมัติ 1299", callback_data=f"apv_{user_id}_1299")],
@@ -291,7 +301,6 @@ async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     try:
-        # ส่งเข้ากลุ่มแอดมิน
         await context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
             photo=photo_file,
@@ -299,7 +308,6 @@ async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(kb),
             parse_mode='HTML'
         )
-        # ตอบกลับลูกค้า
         await update.message.reply_text("📨 <b>ได้รับสลิปแล้วครับ</b>\nรอแอดมินตรวจสอบสักครู่ ระบบจะส่งลิ้งก์ให้ทันทีเมื่ออนุมัติครับ", parse_mode='HTML')
     except Exception as e:
         await update.message.reply_text(f"❌ เกิดข้อผิดพลาดในการส่งสลิป: {e}")
@@ -406,8 +414,7 @@ class handler(BaseHTTPRequestHandler):
             app = ApplicationBuilder().token(TOKEN).build()
             app.add_handler(CommandHandler('start', start))
             app.add_handler(MessageHandler(filters.Regex("gift.truemoney.com"), handle_gift))
-            # 👇 เพิ่ม Handler รับรูปภาพ (สลิป) ตรงนี้
-            app.add_handler(MessageHandler(filters.PHOTO, handle_slip_image)) 
+            app.add_handler(MessageHandler(filters.PHOTO, handle_slip_image))
             app.add_handler(CallbackQueryHandler(button_click))
             async with app: await app.process_update(Update.de_json(update_data, app.bot))
 
