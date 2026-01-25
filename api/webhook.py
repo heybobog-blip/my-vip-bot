@@ -31,7 +31,7 @@ ID_SERIES = -1003281870942
 # ราคา 300, 500 (เลือกห้อง)
 SELECTABLE_ROOMS = {
     "300": [
-        {"id": ID_V1, "name": "VIP 30 วัน"}
+        {"id": ID_MONTHLY, "name": "VIP 30 วัน"}
     ],
     "500": [
         {"id": ID_SAVE, "name": "VIP SAVE"},
