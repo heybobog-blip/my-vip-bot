@@ -109,7 +109,7 @@ async def send_main_menu(update, context, is_edit=False):
 ━━━━━━━━━━━━━━━━━━
 💎 <b>RATE PRICE (แพ็กเกจ)</b> 💎
 
-👑 <b>2499 บาท (GOD TIER)</b> 🔥🔥🔥
+👑 <b>2499 บาท (SUPER GOD TIER)</b> 🔥🔥🔥
 └ <b>ได้ครบทุกกลุ่ม! (5 ห้อง)</b>
 └ กลุ่ม VIP (ถาวร)
 └ กลุ่มเซฟคลิปได้ (ถาวร)
@@ -118,7 +118,7 @@ async def send_main_menu(update, context, is_edit=False):
 └ หนังพรีเมี่ยม ไทย/จีน/เกาหลี (ถาวร)
 └ จ่ายทีเดียวจบ ครบทุกอารมณ์ 
 
-👑 <b>1299 บาท (PREMIUM)</b> 
+👑 <b>1299 บาท (GOD TIER)</b> 
 └ <b>ได้ครบทุกกลุ่ม! (5 ห้อง)</b>
 └ กลุ่ม VIP (90 วัน)
 └ กลุ่มเซฟคลิปได้ (ถาวร)
