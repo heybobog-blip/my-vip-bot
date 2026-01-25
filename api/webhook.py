@@ -28,25 +28,19 @@ ID_MONTHLY = -1003592949127
 ID_INTER = -1003357989161
 ID_SERIES = -1003281870942
 
-# ราคา 300, 500
+# ราคา 300, 500 (เลือกห้อง)
 SELECTABLE_ROOMS = {
     "300": [
-        {"id": ID_MONTHLY, "name": "VVIP (30 วัน)"}
+        {"id": ID_V1, "name": "VIP 30 วัน"}
     ],
     "500": [
-        {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
+        {"id": ID_SAVE, "name": "VIP SAVE"},
         {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"}
     ]
 }
 
-# ราคา 999
-TIER_999_LIST = [
-    {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
-    {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"}
-]
-
-# ราคา 1299
-TIER_1299_LIST = [
+# 🔴 ราคาเหมา (รวมทุกกลุ่ม) ใช้ลิสต์เดียวกันสำหรับ 1299 และ 2499
+ALL_ACCESS_LIST = [
     {"id": ID_SAVE, "name": "VVIP V1 SAVE"},
     {"id": ID_ONLYFAN, "name": "ONLYFAN VIP"},
     {"id": ID_MONTHLY, "name": "VVIP (ถาวร)"},
@@ -107,39 +101,44 @@ def redeem_truemoney(url, phone_number):
         else: return {"status": "error", "message": data.get('status', {}).get('code', 'Unknown Error')}
     except Exception as e: return {"status": "error", "message": str(e)}
 
-# ================= ส่วน Frontend =================
+# ================= ส่วน Frontend (แก้ไขราคาใหม่) =================
 async def send_main_menu(update, context, is_edit=False):
     TEXT = """
 ✨ ยินดีต้อนรับสู่... ✨
-🔥 <b>VVIP (เซียนจู เจริญพร)</b> 🔥
+🔥 <b>VIP (เซียนจู เจริญพร)</b> 🔥
 ━━━━━━━━━━━━━━━━━━
 💎 <b>RATE PRICE (แพ็กเกจ)</b> 💎
 
-👑 <b>1299 บาท (GOD TIER)</b> 🔥🔥🔥
-└ <b>ได้ครบทุกกลุ่ม!</b>
-└ กลุ่ม VVIP (ถาวร)
-└ กลุ่มเซฟคลิปได้
-└ ONLYFAN VIP
-└ VVIP นานาชาติ
-└ หนังพรีเมี่ยม ไทย/จีน/เกาหลี
-└ จ่ายทีเดียวจบ ครบทุกอารมณ์
+👑 <b>2499 บาท (GOD TIER)</b> 🔥🔥🔥
+└ <b>ได้ครบทุกกลุ่ม! (5 ห้อง)</b>
+└ กลุ่ม VIP (ถาวร)
+└ กลุ่มเซฟคลิปได้ (ถาวร)
+└ ONLYFAN VIP (ถาวร)
+└ VVIP นานาชาติ (ถาวร)
+└ หนังพรีเมี่ยม ไทย/จีน/เกาหลี (ถาวร)
+└ จ่ายทีเดียวจบ ครบทุกอารมณ์ (ถาวร)
 
-🏆 <b>999 บาท (KING TIER)</b>
-└ ได้กลุ่ม VVIP (ถาวร) + กลุ่มSave
-└ ❌ ไม่รวม OnlyFan และ VVIP นานาชาติ
+👑 <b>1299 บาท (PREMIUM)</b> 
+└ <b>ได้ครบทุกกลุ่ม! (5 ห้อง)</b>
+└ กลุ่ม VIP (3 เดือน)
+└ กลุ่มเซฟคลิปได้ (ถาวร)
+└ ONLYFAN VIP (ถาวร)
+└ VVIP นานาชาติ (ถาวร)
+└ หนังพรีเมี่ยม ไทย/จีน/เกาหลี (ถาวร)
+└ จ่ายทีเดียวจบ ครบทุกอารมณ์ (ถาวร)
 
 🥈 <b>500 บาท (เลือก 1 กลุ่ม)</b>
-└ เลือกรับ: กลุ่มเซฟคลิปได้ <b>หรือ</b> ONLYFAN VIP
+└ เลือกรับ: กลุ่มเซฟคลิปได้ (ถาวร) <b>หรือ</b> ONLYFAN VIP (ถาวร)
 
 🥉 <b>300 บาท (เลือก 1 กลุ่ม)</b>
-└ เลือกรับ: VVIP V1 (30 วัน)
+└ เลือกรับ: VIP (30 วัน)
 ━━━━━━━━━━━━━━━━━━
 🧧 <b>ระบบจ่ายเงินอัตโนมัติ (Auto)</b> 🧧
 รวดเร็ว ไม่ต้องรอแอดมินตอบ!
 
 📝 <b>วิธีใช้งานบอทชำระเงิน</b>
 1. กดปุ่ม "จ่ายด้วยซอง TrueMoney"
-2. ใส่ยอดเงินตามแพ็กเกจ (300, 500, 999, 1299)
+2. ใส่ยอดเงินตามแพ็กเกจ (300, 500, 1299, 2499)
 3. ส่งลิงก์ซองเข้ามาในแชทนี้
 
 ❓ ติดปัญหา / มีคำถาม?
@@ -172,7 +171,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ➖➖➖➖➖➖➖➖➖➖
 1️⃣ เข้าแอป TrueMoney Wallet เลือกเมนู <b>'ซองของขวัญ'</b>
 2️⃣ เลือกประเภท <b>'ส่งให้คนเดียว'</b>
-3️⃣ ใส่ยอดเงินตามแพ็กเกจที่เลือก <b>(300, 500, 999, 1299)</b>
+3️⃣ ใส่ยอดเงินตามแพ็กเกจที่เลือก <b>(300, 500, 1299, 2499)</b>
 4️⃣ กดสร้างซอง > <b>คัดลอกลิ้งก์</b>
 
 🚀 <b>นำลิ้งก์มาวางส่งในแชทนี้ได้เลยครับ ระบบจะดึงเข้ากลุ่มทันที</b>
@@ -197,7 +196,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {e}")
 
-    # ================= ส่วนอนุมัติ (เพิ่มปุ่มติดต่อลูกค้าหลังกดอนุมัติ) =================
+    # ================= ส่วนอนุมัติ (อัปเดตราคาใหม่ 2499) =================
     elif data.startswith("apv_"):
         try:
             _, target_uid, room_price = data.split('_')
@@ -206,13 +205,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb_client = []
             error_logs = []
 
-            # 1. เตรียมลิสต์ห้องตามราคา
             target_list = []
-            if room_price == "1299": target_list = TIER_1299_LIST
-            elif room_price == "999": target_list = TIER_999_LIST
-            elif room_price in SELECTABLE_ROOMS: target_list = SELECTABLE_ROOMS[room_price]
+            # เช็คราคาและดึงลิสต์ห้อง
+            if room_price == "2499" or room_price == "1299":
+                target_list = ALL_ACCESS_LIST
+            elif room_price in SELECTABLE_ROOMS:
+                target_list = SELECTABLE_ROOMS[room_price]
 
-            # 2. วนลูปสร้างลิ้งก์
             for g in target_list:
                 try:
                     l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv{room_price}_{target_uid}_{rnd}")
@@ -227,35 +226,23 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     error_logs.append(f"- {g['name']}: {e}")
 
             if kb_client:
-                # 3. ส่งลิ้งก์ให้ลูกค้า
+                # ส่งลิ้งก์ให้ลูกค้า
                 try:
                     await context.bot.send_message(target_uid, "✅ <b>สลิป/ยอดเงิน ได้รับการอนุมัติแล้วครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:", reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
                     
-                    # 4. อัปเดตข้อความฝั่งแอดมิน + ใส่ปุ่มติดต่อลูกค้ากลับเข้าไป
+                    # อัปเดตข้อความฝั่งแอดมิน + ใส่ปุ่มติดต่อลูกค้ากลับเข้าไป
                     msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
                     if error_logs: msg_status += "\n\n⚠️ <b>พบปัญหาบางห้อง:</b>\n" + "\n".join(error_logs)
 
-                    # สร้างปุ่มติดต่อลูกค้า
                     contact_user_kb = [[InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]]
-
                     original_text = query.message.caption if query.message.caption else query.message.text
                     
                     try: 
-                        await query.edit_message_caption(
-                            caption=f"{original_text}\n\n{msg_status}", 
-                            reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- ใส่ปุ่มตรงนี้
-                            parse_mode='HTML'
-                        )
+                        await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
                     except: 
-                        await query.edit_message_text(
-                            text=f"{original_text}\n\n{msg_status}", 
-                            reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- ใส่ปุ่มตรงนี้
-                            parse_mode='HTML'
-                        )
+                        await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
 
-                    # ---------------------------------------------------------
-                    # 🔴 5. บันทึกลง Google Sheet
-                    # ---------------------------------------------------------
+                    # บันทึกลง Google Sheet
                     try:
                         user_info = await context.bot.get_chat(target_uid)
                         full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
@@ -279,22 +266,16 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {str(e)}")
 
-    # ปุ่มปฏิเสธสลิป (เพิ่มปุ่มติดต่อลูกค้าหลังกดปฏิเสธ)
+    # ปุ่มปฏิเสธสลิป
     elif data.startswith("reject_"):
         _, target_uid = data.split('_')
         try:
-            # 1. ปุ่มติดต่อลูกค้า (สร้างเตรียมไว้)
-            contact_user_kb = [
-                [InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]
-            ]
-
-            # 2. ปุ่มติดต่อแอดมิน (ส่งไปหาลูกค้า)
+            contact_user_kb = [[InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]]
             contact_admin_kb = [
                 [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001")],
                 [InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
             ]
 
-            # 3. ส่งข้อความแจ้งเตือนลูกค้า
             await context.bot.send_message(
                 chat_id=target_uid, 
                 text="❌ <b>สลิปไม่ผ่านการตรวจสอบ</b>\nโปรดติดต่อแอดมินเพื่อสอบถามข้อมูลเพิ่มเติม", 
@@ -302,30 +283,15 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='HTML'
             )
             
-            # 4. อัปเดตข้อความฝั่งแอดมิน + ใส่ปุ่ม "ทักแชทลูกค้า" กลับเข้าไป
             original_text = query.message.caption if query.message.caption else query.message.text
-            try: 
-                await query.edit_message_caption(
-                    caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", 
-                    reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- ใส่ปุ่มตรงนี้
-                    parse_mode='HTML'
-                )
-            except: 
-                await query.edit_message_text(
-                    text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", 
-                    reply_markup=InlineKeyboardMarkup(contact_user_kb), # <--- และตรงนี้
-                    parse_mode='HTML'
-                )
-                
-        except Exception as e:
-            await query.message.reply_text(f"❌ ส่งแจ้งเตือนลูกค้าไม่ได้: {e}")
+            try: await query.edit_message_caption(caption=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
+            except: await query.edit_message_text(text=f"{original_text}\n\n❌ <b>ปฏิเสธแล้ว</b>", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
+        except:
+            await query.message.reply_text("❌ ส่งแจ้งเตือนลูกค้าไม่ได้")
 
-# ================= ฟังก์ชันรับรูปสลิป =================
+# ================= ฟังก์ชันรับรูปสลิป (อัปเดตปุ่มอนุมัติราคาใหม่) =================
 async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # เช็คว่าเป็นการคุยส่วนตัวเท่านั้น
-    if update.message.chat.type != 'private':
-        return
-
+    if update.message.chat.type != 'private': return
     if not update.message.photo: return
     
     photo_file = update.message.photo[-1].file_id
@@ -341,12 +307,11 @@ async def handle_slip_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 👇 <b>กดปุ่มด้านล่างเพื่ออนุมัติและส่งลิ้งก์:</b>
 """
-    # 🔴 เพิ่มปุ่มติดต่อลูกค้าตรงนี้ครับ
+    # 🔴 ปรับปุ่มอนุมัติ (ลบ 999, เพิ่ม 2499)
     kb = [
         [InlineKeyboardButton("✅ อนุมัติ 300", callback_data=f"apv_{user_id}_300"), InlineKeyboardButton("✅ อนุมัติ 500", callback_data=f"apv_{user_id}_500")],
-        [InlineKeyboardButton("✅ อนุมัติ 999", callback_data=f"apv_{user_id}_999"), InlineKeyboardButton("✅ อนุมัติ 1299", callback_data=f"apv_{user_id}_1299")],
-        [InlineKeyboardButton("❌ ปฏิเสธสลิป", callback_data=f"reject_{user_id}")],
-        [InlineKeyboardButton(f"💬 ติดต่อลูกค้า ({name})", url=f"tg://user?id={user_id}")]
+        [InlineKeyboardButton("✅ อนุมัติ 1299", callback_data=f"apv_{user_id}_1299"), InlineKeyboardButton("✅ อนุมัติ 2499", callback_data=f"apv_{user_id}_2499")],
+        [InlineKeyboardButton("❌ ปฏิเสธสลิป", callback_data=f"reject_{user_id}")]
     ]
 
     try:
@@ -386,7 +351,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sheet_data = [now_str, user_id, full_tg_name, username, link, "สำเร็จ", amt, full_name, v_hash, language, is_premium]
         await asyncio.to_thread(save_to_google_sheet, sheet_data)
 
-        if str(amt) in SELECTABLE_ROOMS or amt >= 999:
+        if str(amt) in SELECTABLE_ROOMS or amt >= 1299:
             admin_report = f"""
 🎁 <b>รายการสำเร็จ (Auto)</b>
 🕒 {now_str}
@@ -400,11 +365,10 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             rnd = random.randint(1000,9999)
             kb = []
-            target_list = []
-            if amt >= 1299: target_list = TIER_1299_LIST
-            elif amt >= 999: target_list = TIER_999_LIST
             
-            if target_list:
+            # 🔴 Logic เช็คยอดเงินแบบใหม่ (1299 และ 2499 ได้ทุกห้อง)
+            if amt >= 1299: # ครอบคลุมทั้ง 1299 และ 2499
+                target_list = ALL_ACCESS_LIST
                 for g in target_list:
                     try:
                         l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Auto{int(amt)}_{user.id}_{rnd}")
@@ -412,7 +376,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except Exception as e:
                         print(f"Error creating link for {g['id']}: {e}")
                 
-                tier_name = "GOD TIER" if amt >= 1299 else "KING TIER"
+                tier_name = "GOD TIER" if amt >= 2499 else "PREMIUM"
                 await msg.edit_text(f"✅ <b>ได้รับยอด {amt} บาท ({tier_name})</b>\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
             
             elif str(amt) in SELECTABLE_ROOMS:
@@ -429,9 +393,10 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎫 Hash: <code>{v_hash}</code>
 👤 <b>ลูกค้า:</b> {full_tg_name}
 """
+            # 🔴 ปุ่มอนุมัติกรณีซองยอดไม่ตรง (Manual)
             admin_kb = [
                 [InlineKeyboardButton("✅ เข้า 300", callback_data=f"apv_{user_id}_300"), InlineKeyboardButton("✅ เข้า 500", callback_data=f"apv_{user_id}_500")],
-                [InlineKeyboardButton("✅ เข้า 999", callback_data=f"apv_{user_id}_999"), InlineKeyboardButton("✅ เข้า 1299", callback_data=f"apv_{user_id}_1299")],
+                [InlineKeyboardButton("✅ เข้า 1299", callback_data=f"apv_{user_id}_1299"), InlineKeyboardButton("✅ เข้า 2499", callback_data=f"apv_{user_id}_2499")],
                 [InlineKeyboardButton(f"💬 ติดต่อลูกค้า", url=f"tg://user?id={user_id}")]
             ]
             try: await context.bot.send_message(ADMIN_GROUP_ID, admin_report, reply_markup=InlineKeyboardMarkup(admin_kb), parse_mode='HTML')
