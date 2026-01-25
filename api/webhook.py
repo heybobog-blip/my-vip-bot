@@ -148,7 +148,7 @@ async def send_main_menu(update, context, is_edit=False):
     keyboard = [
         [InlineKeyboardButton("🧧 จ่ายด้วยซอง TrueMoney (Auto 🚀)", callback_data="mode_gift")],
         [InlineKeyboardButton("⭐️ เช็คเครดิต", url="https://t.me/+uoEnKbH_PP05NWQ1"), InlineKeyboardButton("🎥 กลุ่มตัวอย่าง", url="https://t.me/+AW9tXzXd_kcxZTA1")],
-        [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
+        [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001"), InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/Dudez69")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     if is_edit:
@@ -274,7 +274,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             contact_user_kb = [[InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]]
             contact_admin_kb = [
                 [InlineKeyboardButton("👤 ติดต่อแอดมิน 1", url="https://t.me/ZeinJu001")],
-                [InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/duded16")]
+                [InlineKeyboardButton("👤 ติดต่อแอดมิน 2", url="https://t.me/Dudez69")]
             ]
 
             await context.bot.send_message(
