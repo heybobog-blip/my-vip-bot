@@ -125,7 +125,7 @@ async def send_main_menu(update, context, is_edit=False):
 └ ONLYFAN VIP (ถาวร)
 └ VVIP นานาชาติ (ถาวร)
 └ หนังพรีเมี่ยม ไทย/จีน/เกาหลี (ถาวร)
-└ จ่ายทีเดียวจบ ครบทุกอารมณ์
+└ ครบทุกอารมณ์
 
 🥈 <b>500 บาท (โปรคุ้ม x2)</b>
 └ <b>รับทันที:</b> VIP รายเดือน (30 วัน)
@@ -189,17 +189,12 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("claim_main_500"):
         try:
             rnd = random.randint(1000,9999)
-            # สร้างลิ้งก์กลุ่มหลัก
             l_main = await context.bot.create_chat_invite_link(chat_id=ID_MONTHLY, member_limit=1, name=f"ClaimMain500_{user_id}_{rnd}")
             
-            # ข้อความแจ้ง
             msg_text = f"✅ <b>ยืนยันสิทธิ์เรียบร้อย (500 บาท)</b>\n\n1️⃣ กดปุ่ม <b>'👑 เข้ากลุ่มหลัก'</b> ด้านบนสุดเพื่อเข้ากลุ่ม\n2️⃣ จากนั้นกดเลือกของแถมอีก 1 กลุ่มด้านล่างครับ 👇"
             
             kb = []
-            # 🔴 ปุ่ม 1: เข้ากลุ่มหลัก (ยัดลิ้งก์ไว้ในปุ่มเลย)
             kb.append([InlineKeyboardButton("👑 กดเข้ากลุ่มหลัก (VIP 30 วัน)", url=l_main.invite_link)])
-            
-            # 🔴 ปุ่ม 2: เลือกของแถม
             for r in SELECTABLE_ROOMS["500"]:
                 kb.append([InlineKeyboardButton(f"🎁 เลือกรับ {r['name']}", callback_data=f"sel_{r['id']}_500")])
             
@@ -214,28 +209,40 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             _, gid, price = data.split('_')
             rnd = random.randint(1000,9999)
             
-            # สร้างลิ้งก์ห้องที่เลือก (ของแถม หรือ ห้องทั่วไป)
+            # 🔴 [UPDATE] ค้นหาชื่อกลุ่มเพื่อเอามาโชว์บนปุ่ม
+            group_name = "กลุ่มที่เลือก" # Default กันเหนียว
+            for p_key in SELECTABLE_ROOMS:
+                for room in SELECTABLE_ROOMS[p_key]:
+                    if str(room["id"]) == str(gid):
+                        group_name = room["name"]
+                        break
+            
+            # สร้างลิ้งก์
             link_name = f"User_{user_id}_{price}_{rnd}"
             link = await context.bot.create_chat_invite_link(chat_id=int(gid), member_limit=1, name=link_name)
             
-            # ปุ่มเข้าห้องที่เลือก
-            kb = [[InlineKeyboardButton("👉 กดเข้ากลุ่มที่เลือก 👈", url=link.invite_link)]]
+            # ปุ่มเข้าห้องที่เลือก (โชว์ชื่อกลุ่ม)
+            kb = [[InlineKeyboardButton(f"👉 เข้ากลุ่ม: {group_name} 👈", url=link.invite_link)]]
 
             msg_text = f"✅ <b>ทำรายการครบถ้วนครับ</b>\nกดเข้ากลุ่มด้านล่างได้เลย:"
             
-            # 🔴 ถ้าเป็น 500 ให้ส่ง "ปุ่มกลุ่มหลัก" มาซ้ำ (Persistent Button)
             if price == "500" or price == "500.0":
                 l_main_repeat = await context.bot.create_chat_invite_link(chat_id=ID_MONTHLY, member_limit=1, name=f"User_{user_id}_MainRepeat_{rnd}")
-                # เพิ่มปุ่มกลุ่มหลักไว้ด้านบนสุด
                 kb.insert(0, [InlineKeyboardButton("👑 เข้ากลุ่มหลัก (VIP 30 วัน)", url=l_main_repeat.invite_link)])
                 msg_text += "\n\n⚠️ <b>อย่าลืมกดเข้าให้ครบทั้ง 2 กลุ่มนะครับ!</b>"
 
             await query.edit_message_text(msg_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
-            await context.bot.send_message(user_id, THANK_YOU_TEXT)
+            
+            review_kb = [
+                [InlineKeyboardButton("⭐️ รีวิวกับแอดมิน 1", url="https://t.me/ZeinJu001")],
+                [InlineKeyboardButton("⭐️ รีวิวกับแอดมิน 2", url="https://t.me/Dudez69")]
+            ]
+            await context.bot.send_message(user_id, THANK_YOU_TEXT, reply_markup=InlineKeyboardMarkup(review_kb))
+
         except Exception as e:
             await query.message.reply_text(f"❌ Error: {e}")
 
-    # ================= ส่วนอนุมัติ (อัปเดต Flow 500) =================
+    # ================= ส่วนอนุมัติ =================
     elif data.startswith("apv_"):
         try:
             _, target_uid, room_price = data.split('_')
@@ -250,12 +257,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif room_price in SELECTABLE_ROOMS:
                 target_list = SELECTABLE_ROOMS[room_price]
 
-            # 🔴 Logic 500: ส่งปุ่ม "เริ่มรับกลุ่ม"
             if room_price == "500":
                 kb_client.append([InlineKeyboardButton("👑 กดรับกลุ่มหลัก (Step 1)", callback_data="claim_main_500")])
-            
             else:
-                # ราคาอื่นๆ วนลูปสร้างปุ่มปกติ
                 for g in target_list:
                     try:
                         l = await context.bot.create_chat_invite_link(chat_id=g["id"], member_limit=1, name=f"Apv{room_price}_{target_uid}_{rnd}")
@@ -273,7 +277,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     await context.bot.send_message(target_uid, msg_text, reply_markup=InlineKeyboardMarkup(kb_client), parse_mode='HTML')
                     
-                    # อัปเดตฝั่งแอดมิน
                     msg_status = f"✅ <b>อนุมัติเข้าห้อง {room_price} เรียบร้อย</b>"
                     if error_logs: msg_status += "\n⚠️ " + str(error_logs)
                     contact_user_kb = [[InlineKeyboardButton("💬 ทักแชทลูกค้า", url=f"tg://user?id={target_uid}")]]
@@ -282,7 +285,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try: await query.edit_message_caption(caption=f"{original_text}\n\n{msg_status}", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
                     except: await query.edit_message_text(text=f"{original_text}\n\n{msg_status}", reply_markup=InlineKeyboardMarkup(contact_user_kb), parse_mode='HTML')
 
-                    # Save Sheet
                     try:
                         user_info = await context.bot.get_chat(target_uid)
                         full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
@@ -379,7 +381,6 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
             rnd = random.randint(1000,9999)
             kb = []
             
-            # Logic: 1299/2499
             if amt >= 1299:
                 target_list = ALL_ACCESS_LIST
                 for g in target_list:
@@ -390,9 +391,7 @@ async def handle_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tier_name = "GOD TIER" if amt >= 2499 else "PREMIUM"
                 await msg.edit_text(f"✅ <b>ยอด {amt} ({tier_name})</b>\nกดเข้ากลุ่มด้านล่าง:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
             
-            # 🔴 Logic 500 (Step-by-Step)
             elif int(amt) == 500:
-                # ส่งปุ่ม Step 1 ให้กดรับกลุ่มหลักก่อน
                 kb.append([InlineKeyboardButton("👑 กดรับกลุ่มหลัก (Step 1)", callback_data="claim_main_500")])
                 await msg.edit_text(f"✅ <b>ได้รับยอด 500 บาท</b>\nกรุณากดปุ่มด้านล่างเพื่อรับกลุ่มตามลำดับครับ 👇", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
 
