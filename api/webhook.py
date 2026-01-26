@@ -106,7 +106,7 @@ async def send_main_menu(update, context, is_edit=False):
     TEXT = """
 ✨ ยินดีต้อนรับสู่... ✨
 🔥 <b>VIP (เซียนจู เจริญพร)</b> 🔥
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━
 💎 <b>RATE PRICE (แพ็กเกจ)</b> 💎
 
 👑 <b>2499 บาท (SUPER GOD TIER)</b> 🔥🔥🔥
@@ -133,7 +133,7 @@ async def send_main_menu(update, context, is_edit=False):
 
 🥉 <b>300 บาท (เลือก 1 กลุ่ม)</b>
 └ เลือกรับ: VIP (30 วัน)
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━
 🧧 <b>ระบบจ่ายเงินอัตโนมัติ (Auto)</b> 🧧
 รวดเร็ว ไม่ต้องรอแอดมินตอบ!
 
